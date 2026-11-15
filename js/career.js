@@ -568,6 +568,7 @@ function Futbol(host) {
   }
   // Older saves: upgrade points become development rights (capped), skill points start at 0
   function migrate(d) {
+    FBT.seed = d.created || '';
     // growing thresholds: estimate levels already passed from the rights earned so far (spent + unspent)
     if (d.p.up != null && d.p.lvl == null) { const spent = Object.values(d.p.attr).reduce((a, b) => a + b, 0) - 270; d.p.lvl = Math.max(0, Math.floor((Math.max(0, spent) + d.p.up) / 3)); }
     if (d.set && d.set.zoom == null) d.set.zoom = 1;
@@ -580,6 +581,7 @@ function Futbol(host) {
   function createCareer() {
     const d = sub.d;
     C = { v: 2, created: Date.now().toString(36), club: d.club, p: { first: d.first, last: d.last, short: d.short, num: d.num, pos: d.pos, look: d.look, attr: d.attr, age: 18, up: 0, skill: 0, lvl: 0 }, tot: { apps: 0, g: 0, a: 0, rs: 0 }, tro: [], hist: [], news: [], prev: null, set: { len: 270, zoom: 1 }, live: null };
+    FBT.seed = C.created;
     newSeason(2026);
     news(`✍️ ${d.first} ${d.last}, ${club().name} ile ilk profesyonel sözleşmesini imzaladı! Forma: ${d.num} · ${FBU.trU(d.short)}`);
     if (!save()) toast('⚠️ Kayıt oluşturulamadı'); FBA.play('sign'); tab = 'ana'; show('hub');
@@ -672,7 +674,7 @@ function Futbol(host) {
     const ROLE_TR = { GK: 'KL', LB: 'SLB', LCB: 'STP', RCB: 'STP', RB: 'SĞB', LCM: 'MO', CM: 'MO', RCM: 'OOS', LW: 'SLK', ST: 'SF', RW: 'SĞK' };
     el.innerHTML = `<div class="fb-kits"><div class="fb-kit"></div><div class="fb-kit"></div></div><h4>${esc(t.name)} · İlk 11 (4-3-3)</h4><div class="fb-list">${sq.map(x => {
       const mine = x.role === role, num = mine ? p.num : (x.num === p.num ? 13 : x.num), name = mine ? p.first + ' ' + p.last : x.name;
-      return `<div class="fb-li ${mine ? 'me' : ''}"><span class="fb-no" style="background:${t.c1};color:${FBU.ink(t.c1)}">${num}</span><span class="grow">${esc(name)}${mine ? ' ⭐' : ''}</span><small>${ROLE_TR[x.role]}</small><span class="fb-r">${mine ? FBC.ovr(p) : Math.round(x.sk * 100) - 5}</span></div>`;
+      return `<div class="fb-li ${mine ? 'me' : ''}"><span class="fb-no" style="background:${t.c1};color:${FBU.ink(t.c1)}">${num}</span><span class="grow">${mine ? '' : (FB_NAT[x.nat] || '') + ' '}${esc(name)}${mine ? ' ⭐' : ''}</span><small>${ROLE_TR[x.role]}</small><span class="fb-r">${mine ? FBC.ovr(p) : Math.round(x.sk * 100) - 5}</span></div>`;
     }).join('')}</div>`;
     const k = el.querySelectorAll('.fb-kit'); k[0].appendChild(avatar(p, t, false, 62)); k[1].appendChild(avatar(p, t, true, 62));
   }

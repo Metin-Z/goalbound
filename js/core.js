@@ -60,21 +60,38 @@ const FBT = {
   },
   ROLES: ['GK', 'LB', 'LCB', 'RCB', 'RB', 'LCM', 'CM', 'RCM', 'LW', 'ST', 'RW'],
   NUMS: { GK: 1, LB: 3, LCB: 4, RCB: 5, RB: 2, LCM: 8, CM: 6, RCM: 10, LW: 11, ST: 9, RW: 7 },
-  // Deterministic 11 for a club (real roster from FB_ROSTERS if provided)
+  // Career name seed (set from the save's creation id); every career gets its own player names
+  seed: '',
+  _sq: null,
+  // Deterministic 11 for a club, from the career-wide name table (real roster from FB_ROSTERS if provided)
   squad(id) {
-    const t = FBT.team(id), r = FBU.rng('sq' + id), L = t.lg, real = FB_ROSTERS[id];
-    const pools = ['tr', 'en', 'es', 'it', 'fr', 'de', 'pt', 'nl', 'world', 'world', 'world'];
-    const used = new Set();
-    return FBT.ROLES.map((role, k) => {
-      let name;
-      if (real && real[k]) name = real[k];
-      else {
-        const nat = r() < L.dom ? L.nat : FBU.pick(pools.filter(p => p !== L.nat), r), [f, s] = FB_NAMES[nat];
-        do { name = FBU.pick(f.split(','), r) + ' ' + FBU.pick(s.split(','), r); } while (used.has(name)); used.add(name);
-      }
-      let num = FBT.NUMS[role]; if (r() < .35 && role !== 'GK') num = [14, 17, 19, 20, 21, 22, 23, 27, 33, 77, 88, 99][(r() * 12) | 0];
-      return { role, name, short: name.split(' ').slice(-1)[0], num, sk: FBU.clamp(t.r / 100 + (r() - .5) * .12, .45, .97) };
+    if (!FBT._sq || FBT._sq.seed !== FBT.seed) FBT._sq = { seed: FBT.seed, map: FBT._build(FBT.seed) };
+    return FBT._sq.map[id].map(p => ({ ...p }));
+  },
+  // Build every club's 11 in fixed order so no name repeats anywhere in the career and nobody plays for two clubs
+  _build(seed) {
+    const used = new Set(), map = {};
+    FBT.all().forEach(id => {
+      const t = FBT.team(id), r = FBU.rng('sq' + seed + id), L = t.lg, real = FB_ROSTERS[id], shorts = new Set();
+      const dom = FBU.clamp(L.dom - (t.r - 72) * .012, .2, .9), foreign = FB_FOREIGN.filter(n => n !== L.nat && FB_NAMES[n]);
+      map[id] = FBT.ROLES.map((role, k) => {
+        let name, nat = L.nat;
+        if (real && real[k]) name = real[k];
+        else {
+          for (let tries = 0; ; tries++) {
+            nat = r() < dom ? L.nat : FBU.pick(foreign, r);
+            const [f, s] = FB_NAMES[nat] || FB_NAMES.world;
+            name = FBU.pick(f.split(','), r) + ' ' + FBU.pick(s.split(','), r);
+            if (!used.has(name) && !FB_BLOCK.has(name) && (!shorts.has(name.split(' ').slice(-1)[0]) || tries > 30)) break;
+          }
+          used.add(name);
+        }
+        shorts.add(name.split(' ').slice(-1)[0]);
+        let num = FBT.NUMS[role]; if (r() < .35 && role !== 'GK') num = [14, 17, 19, 20, 21, 22, 23, 27, 33, 77, 88, 99][(r() * 12) | 0];
+        return { role, name, nat, short: name.split(' ').slice(-1)[0], num, sk: FBU.clamp(t.r / 100 + (r() - .5) * .12, .45, .97) };
+      });
     });
+    return map;
   }
 };
 
