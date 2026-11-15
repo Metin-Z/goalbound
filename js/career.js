@@ -493,7 +493,7 @@ function Futbol(host) {
   }
   function startNext(toClub) {
     if (toClub && toClub !== C.club) { const t = FBT.team(toClub); news(`✍️ Transfer! ${t.name} ile sözleşme imzaladın`); C.club = toClub; FBA.play('sign'); }
-    C.phase = null; C.offers = []; newSeason(C.s.year + 1); save(); show('hub');
+    C.phase = null; C.offers = []; delete sub.lgView; newSeason(C.s.year + 1); save(); show('hub');
   }
 
   /* ---------- Screens ---------- */
@@ -659,7 +659,7 @@ function Futbol(host) {
       const tbn = e.target.closest('[data-tab]'); if (tbn) { FBA.play('ui'); goTab(tbn.dataset.tab); return; }
       const b = e.target.closest('button'); if (!b || !b.dataset.a) return; hubAct(b, f);
     };
-    main.onchange = e => { if (e.target.dataset.a === 'istlg') return; if (e.target.dataset.a === 'lgsel') { sub.lgView = e.target.value; FBA.play('ui'); renderHub(); } if (e.target.dataset.a === 'cupsel') { sub.cupView = e.target.value; renderHub(); } };
+    main.onchange = e => { if (e.target.dataset.a === 'lgsel') { sub.lgView = e.target.value; FBA.play('ui'); renderHub(); } if (e.target.dataset.a === 'cupsel') { sub.cupView = e.target.value; renderHub(); } };
     main.oninput = e => { const k = e.target.dataset.v; if (k) { FBA.setVol(k, e.target.type === 'checkbox' ? +e.target.checked : e.target.value / 100); sndUI(); if (k === 'hap' && e.target.checked) FBA.buzz(30); } if (e.target.dataset.zoom) { C.set.zoom = e.target.value / 100; save(true); } };
   }
   function hubAct(b, f) {
@@ -714,9 +714,13 @@ function Futbol(host) {
       return `<tr class="${hi === i ? 'me' : ''}"><td class="z ${z}">${k + 1}</td><td class="l">${FBT.badge(t, 16)} ${esc(t.name)}</td><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4] - r[5]}</td><td><b>${r[1] * 3 + r[2]}</b></td><td class="fm"><span class="fb-fm">${[...fm].map(c => `<i class="${c}"></i>`).join('')}</span></td></tr>`;
     }).join('')}</table><div class="fb-leg"><span class="z ucl"></span>Şampiyonlar Ligi <span class="z uel"></span>Avrupa Ligi <span class="z uecl"></span>Konferans Ligi <small>(gelecek sezon)</small></div>`;
   }
+  // Shared league filter: one state (sub.lgView) used by the standings and every statistics category
+  const viewLg = () => (sub.lgView && FBT.league(sub.lgView)) ? sub.lgView : C.s.lg;
+  const tabOf = lg => lg === C.s.lg ? C.s.tab : C.s.o[lg].tab;
+  const lgSelect = v => `<select class="fb-sel" data-a="lgsel">${FB_LEAGUES.map(L => `<option value="${L.id}" ${L.id === v ? 'selected' : ''}>${L.flag} ${esc(L.name)}${L.id === C.s.lg ? ' (senin ligin)' : ''}</option>`).join('')}</select>`;
   function tabLig(el) {
-    const v = sub.lgView || C.s.lg, mine = v === C.s.lg, tabArr = mine ? C.s.tab : C.s.o[v].tab;
-    el.innerHTML = `<select class="fb-sel" data-a="lgsel">${FB_LEAGUES.map(L => `<option value="${L.id}" ${L.id === v ? 'selected' : ''}>${L.flag} ${esc(L.name)}${L.id === C.s.lg ? ' (senin ligin)' : ''}</option>`).join('')}</select>` + table(v, tabArr, mine ? myIdx() : -1) + (FBT.league(v).euro[0] === 0 ? '<p class="fb-note">Rusya kulüpleri UEFA turnuvalarından men edildiği için Avrupa kotası yok.</p>' : '');
+    const v = viewLg(), mine = v === C.s.lg, tabArr = tabOf(v);
+    el.innerHTML = lgSelect(v) + table(v, tabArr, mine ? myIdx() : -1) + (FBT.league(v).euro[0] === 0 ? '<p class="fb-note">Rusya kulüpleri UEFA turnuvalarından men edildiği için Avrupa kotası yok.</p>' : '');
   }
   function tabFik(el) {
     const s = C.s, F = fixtures(); let h = '<div class="fb-list">';
@@ -776,14 +780,14 @@ function Futbol(host) {
   // League statistics: scorers, assists, contributions, appearances, team records
   function tabIst(el) {
     ensureStats();
-    const lgv = sub.istLg || C.s.lg, mineLg = lgv === C.s.lg, v = sub.istView === 't' && !mineLg ? 'g' : (sub.istView || 'g'), L = FBT.league(lgv);
+    const lgv = viewLg(), mineLg = lgv === C.s.lg, v = sub.istView || 'g', L = FBT.league(lgv);
     const chips = [['g', '👟 Gol Krallığı'], ['a', '🎯 Asist Krallığı'], ['ga', '⚡ Gol + Asist'], ['m', '🏃 Maç'], ['t', '🛡️ Takımlar']];
-    let h = `<select class="fb-sel" data-a="istlg">${FB_LEAGUES.map(X => `<option value="${X.id}" ${X.id === lgv ? 'selected' : ''}>${X.flag} ${esc(X.name)}${X.id === C.s.lg ? ' (senin ligin)' : ''}</option>`).join('')}</select><p class="fb-mut">${C.s.year}-${String(C.s.year + 1).slice(2)} · ${C.s.res.filter(Boolean).length}. hafta sonrası</p><div class="fb-chips">${chips.filter(c => mineLg || c[0] !== 't').map(([k, l]) => `<button class="fb-chip ${k === v ? 'on' : ''}" data-ist="${k}">${l}</button>`).join('')}</div>`;
+    let h = `${lgSelect(lgv)}<p class="fb-mut">${C.s.year}-${String(C.s.year + 1).slice(2)} · ${C.s.res.filter(Boolean).length}. hafta sonrası</p><div class="fb-chips">${chips.map(([k, l]) => `<button class="fb-chip ${k === v ? 'on' : ''}" data-ist="${k}">${l}</button>`).join('')}</div>`;
     if (v === 't') {
-      const tab = C.s.tab, ord = FBC.order(tab);
-      h += `<table class="fb-tbl"><tr><th>#</th><th class="l">Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>AG</th><th>YG</th><th>P</th></tr>${ord.map((i, k) => { const r = tab[i], t = FBT.team(C.s.lg + ':' + i); return `<tr class="${i === myIdx() ? 'me' : ''}"><td>${k + 1}</td><td class="l">${FBT.badge(t, 16)} ${esc(t.name)}</td><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td><td>${r[5]}</td><td><b>${r[1] * 3 + r[2]}</b></td></tr>`; }).join('')}</table>`;
+      const tab = tabOf(lgv), ord = FBC.order(tab), mi2 = mineLg ? myIdx() : -1;
+      h += `<table class="fb-tbl"><tr><th>#</th><th class="l">Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>AG</th><th>YG</th><th>P</th></tr>${ord.map((i, k) => { const r = tab[i], t = FBT.team(lgv + ':' + i); return `<tr class="${i === mi2 ? 'me' : ''}"><td>${k + 1}</td><td class="l">${FBT.badge(t, 16)} ${esc(t.name)}</td><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td><td>${r[5]}</td><td><b>${r[1] * 3 + r[2]}</b></td></tr>`; }).join('')}</table>`;
       const most = ord.slice().sort((a, b) => tab[b][4] - tab[a][4])[0], best = ord.slice().sort((a, b) => tab[a][5] - tab[b][5])[0];
-      if (C.s.res.filter(Boolean).length) h += `<div class="fb-tip">⚽ En golcü takım: <b>${esc(FBT.team(C.s.lg + ':' + most).name)}</b> (${tab[most][4]}) · 🧱 En az gol yiyen: <b>${esc(FBT.team(C.s.lg + ':' + best).name)}</b> (${tab[best][5]})</div>`;
+      if (tab.some(r => r[0])) h += `<div class="fb-tip">⚽ En golcü takım: <b>${esc(FBT.team(lgv + ':' + most).name)}</b> (${tab[most][4]}) · 🧱 En az gol yiyen: <b>${esc(FBT.team(lgv + ':' + best).name)}</b> (${tab[best][5]})</div>`;
       el.innerHTML = h; bindIst(el); return;
     }
     const idx = { g: 1, a: 2, ga: 3, m: 0 }[v], unit = { g: 'gol', a: 'asist', ga: 'G+A', m: 'maç' }[v], list = leaders(idx, lgv), top = list.slice(0, 20), mi = list.findIndex(x => x.k === 'ME');
@@ -792,7 +796,7 @@ function Futbol(host) {
     h += `<p class="fb-mut">${mi >= 0 ? `Senin sıran: <b>${mi + 1}.</b> (${list[mi].v} ${unit})` : `Henüz bu listede değilsin.`}</p>`;
     el.innerHTML = h; bindIst(el);
   }
-  function bindIst(el) { el.querySelectorAll('[data-ist]').forEach(b => b.onclick = () => { sub.istView = b.dataset.ist; FBA.play('ui'); renderHub(); }); const se = el.querySelector('[data-a=istlg]'); if (se) se.onchange = () => { sub.istLg = se.value; FBA.play('ui'); renderHub(); }; }
+  function bindIst(el) { el.querySelectorAll('[data-ist]').forEach(b => b.onclick = () => { sub.istView = b.dataset.ist; FBA.play('ui'); renderHub(); }); }
   function tabKar(el) {
     const t = C.tot, H = C.hist.slice().reverse();
     const s = C.s, cur = !C.phase && s.my.apps ? (() => { const tt = club(), pos = FBC.order(s.tab).indexOf(myIdx()) + 1; return `<div class="fb-li now">${FBT.badge(tt, 20)}<span class="grow">${s.year}-${String(s.year + 1).slice(2)} · ${esc(tt.name)}<small>Devam ediyor · ${s.res.filter(Boolean).length}. hafta · lig ${pos}.</small></span><b>${s.my.g}G ${s.my.a}A</b><span class="fb-r">${(s.my.rs / s.my.apps).toFixed(2)}</span></div>`; })() : '';
