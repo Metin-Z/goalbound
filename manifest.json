@@ -2,7 +2,7 @@
   "id": "./",
   "name": "GOALBOUND",
   "short_name": "GOALBOUND",
-  "description": "Tek oyunculu futbol kariyer oyunu: oyuncunu yarat, Süper Lig'den başla, Avrupa'yı fethet.",
+  "description": "Tek oyunculu futbol kariyer oyunu: oyuncunu yarat, istediğin ligden başla, Avrupa'yı fethet.",
   "lang": "tr",
   "dir": "ltr",
   "start_url": "./?source=pwa",

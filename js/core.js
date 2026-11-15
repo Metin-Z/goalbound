@@ -50,7 +50,26 @@ const FBU = {
 const FBT = {
   team(id) {
     const [lg, i] = id.split(':'), L = FB_LEAGUES.find(l => l.id === lg), t = L.teams[+i];
-    return { id, lg: L, name: t[0], abbr: t[1], c1: t[2], c2: t[3], r: t[4] };
+    return { id, lg: L, name: t[0], abbr: t[1] || FBT.abbr(id), c1: t[2], c2: t[3], r: t[4] };
+  },
+  // Short code derived from the club name (unique within its league): 1 word → first 3 letters,
+  // 2 words → initial + 2 letters of the second word, 3+ words → initials. Cached per league.
+  _ab: {},
+  abbr(id) {
+    const lg = id.split(':')[0];
+    if (!FBT._ab[lg]) {
+      const L = FBT.league(lg), up = w => w.toLocaleUpperCase(lg === 'tr' || lg === 'az' ? 'tr-TR' : 'en'), used = new Set(), out = [];
+      L.teams.forEach(t => {
+        const ws = t[0].split(/[\s.\-\/']+/).filter(w => w && !/^(FK|SK|FC|SC|AC|CF|SFK)$/i.test(w)), W = ws.length ? ws : [t[0]];
+        const cands = [W.length >= 3 ? W[0][0] + W[1][0] + W[2][0] : W.length === 2 ? W[0][0] + W[1].slice(0, 2) : W[0].slice(0, 3),
+          W.length >= 2 ? W[0].slice(0, 2) + W[1][0] : W[0][0] + W[0].slice(2, 4), W.length >= 2 ? W[0][0] + W[1][0] + W[1].slice(-1) : W[0].slice(0, 2) + W[0].slice(-1), W.join('').slice(0, 4)];
+        let a = cands.map(up).find(c => !used.has(c)) || up(W.join('').slice(0, 3)) + out.length;
+        if (t[1]) a = t[1];
+        used.add(a); out.push(a);
+      });
+      FBT._ab[lg] = out;
+    }
+    return FBT._ab[lg][+id.split(':')[1]];
   },
   league: id => FB_LEAGUES.find(l => l.id === id),
   ids: lg => FBT.league(lg).teams.map((_, i) => lg + ':' + i),

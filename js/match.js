@@ -278,9 +278,9 @@ function FBMatch(host, o) {
       const fx = me.x + Math.cos(sl.ang) * .55, fy = me.y + Math.sin(sl.ang) * .55;
       if (!sl.hit && Math.hypot(fx - ball.x, fy - ball.y) < FBX.footR(A) + (TUT ? .25 : 0)) {
         sl.hit = true;
-        if (sl.clean || m.looseT < .3 || R() < FBX.duel(A, o.opp.r)) return duelWon(m);
+        if (sl.clean || m.looseT < (TUT ? .3 : .05) || R() < FBX.duel(A, o.opp.r)) return duelWon(m);   // timing decides; strength only settles a 50-50
         pop('Rakip sıyrıldı!', '#fca5a5'); c.cool = .2; FBA.play('touch');   // 50-50 lost: he rides the challenge
-      } else if (!sl.hit && d2(me, c) < .7) return duelFoul(m);
+      } else if (!sl.hit && d2(me, c) < .6 && Math.hypot(fx - ball.x, fy - ball.y) > FBX.footR(A) * 1.5) return duelFoul(m);   // took the man, clearly not the ball
       if (sl.t >= sl.dur) { me.slide = null; me.stun = FBX.recover(A); me.vx = me.vy = 0; }
     } else if (me.stun > 0) { me.stun -= dt; }
     else if (m.fing) {
@@ -653,7 +653,7 @@ function FBMatch(host, o) {
   function idleAI(dt) {
     if (mom && mom.type === 'pen') return;   // penalty: everyone waits outside the box
     for (const p of ALL) {
-      if (p.lane || p === ball.own || p === me || p === GK1 || p.keep || (mom && (mom.defs.includes(p) || mom.mates.includes(p) || mom.recv === p))) continue;
+      if (p.lane || p === ball.own || p === me || p === GK1 || p.keep || (mom && (mom.defs.includes(p) || mom.mates.includes(p) || mom.recv === p || (mom.car === p && !mom.res)))) continue;
       const t = formTarget(p, ball.x, ball.y);
       // Only the scene's own defenders press the user; everyone else keeps a sensible distance
       if (mom && p.team === 1) { const dx = t[0] - me.x, dy = t[1] - me.y, l = Math.hypot(dx, dy); if (l < 5.5) { const k = 5.5 / (l || 1); t[0] = me.x + (l ? dx : 1) * k; t[1] = me.y + (l ? dy : 0) * k; } }

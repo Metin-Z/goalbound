@@ -275,7 +275,7 @@ function Futbol(host) {
   const MONTHS = ['Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs'];
   const tn = id => FBT.team(id).name, pickR = a => a[(Math.random() * a.length) | 0];
   function coach(club) { const t = FBT.team(club), N = FB_NAMES[t.lg.nat] || FB_NAMES.world, r = FBU.rng('coach' + club), f = N[0].split(','), l = N[1].split(','); return f[(r() * f.length) | 0] + ' ' + l[(r() * l.length) | 0]; }
-  function derbyOf(a, b) { const x = tn(a), y = tn(b), d = FB_DERBY.find(([p, q]) => (p === x && q === y) || (p === y && q === x)); return d ? d[2] : null; }
+  function derbyOf(a, b) { const d = FB_DERBY.find(([p, q]) => (p === a && q === b) || (p === b && q === a)); return d ? d[2] : null; }
   const MEDIA = {
     big: ['en', 'es', 'it', 'de', 'fr'], notes: [],
     // Add a news item unless the same headline (or the same template, via extra.tid) ran recently
@@ -366,7 +366,7 @@ function Futbol(host) {
       this.big.filter(x => s.o[x]).forEach(lg => { const t1 = leaders(1, lg)[0]; if (!t1) return; const ms = [30, 25, 20, 15, 10].find(m => t1.v >= m), fk = 'ms' + lg + ms; if (ms && !s.flags[fk]) { s.flags[fk] = 1; const w = who(t1.k); out.push(['dunya', ms >= 20 ? 1 : 0, `${FBT.league(lg).flag} ${w.name} ${ms} gole ulaştı`, `${tn(w.club)} forması giyen golcü ${FBU.ek(FBT.league(lg).name, 'loc')} gol krallığı yarışında başı çekiyor.`]); } });
       if (Math.random() < .12) { const lg = pickR(this.big.filter(x => s.o[x])), cand = lg ? leaders(3, lg).slice(0, 8) : []; if (cand.length) { const x = pickR(cand), w = who(x.k), wk = 2 + ((Math.random() * 5) | 0); (s.inj || (s.inj = {}))[x.k] = wk; out.push(['dunya', 0, `${FBT.league(lg).flag} ${FBU.ek(tn(w.club), 'dat')} şok: ${w.name} ${wk} hafta yok`, `Yıldız oyuncunun sakatlığı ${FBU.ek(FBT.league(lg).name, 'gen')} dengelerini değiştirebilir.`]); } }
       if (Math.random() < .1) { const lg = pickR(this.big), tA = leaders(2, lg)[0], dest = FBT.all().filter(id => FBT.team(id).r >= 86); if (tA && dest.length) { const w = who(tA.k), d2 = pickR(dest.filter(id => id !== w.club)); out.push(['dunya', 0, `${FBT.league(lg).flag} Transfer bombası: ${w.name}, ${FBU.ek(tn(d2), 'gen')} radarında`, `${tA.v} asistlik oyun kurucu için dev bir teklifin hazırlandığı konuşuluyor.`]); } }
-      if (Math.random() < .14) { const dd = FB_DERBY.filter(([a]) => FBT.all().some(id => tn(id) === a && id.startsWith(s.lg + ':'))); const d = dd.length ? pickR(dd) : pickR(FB_DERBY); const [fh, fid] = this.pickT('fx', [`Rıza Mikrofon ile Hoca Taktikçi canlı yayında ${d[2]} yüzünden birbirine girdi`, `${d[0]} taraftarı ${d[1]} maçı öncesi şehre dev pankart astı`, `${d[1]} başkanı: "${d[0]} bizden korkuyor"`, `Yorumcu masasında kahve döküldü: tartışma ${d[2]} üzerineydi`]); out.push(['magazin', 0, fh, `Spor gündemi yine sıcak.`, { tid: fid }]); }
+      if (Math.random() < .14) { const dd = FB_DERBY.filter(([a]) => a.startsWith(s.lg + ':')); const d = dd.length ? pickR(dd) : pickR(FB_DERBY), d0 = tn(d[0]), d1 = tn(d[1]); const [fh, fid] = this.pickT('fx', [`Rıza Mikrofon ile Hoca Taktikçi canlı yayında ${d[2]} yüzünden birbirine girdi`, `${d0} taraftarı ${d1} maçı öncesi şehre dev pankart astı`, `${d1} başkanı: "${d0} bizden korkuyor"`, `Yorumcu masasında kahve döküldü: tartışma ${d[2]} üzerineydi`]); out.push(['magazin', 0, fh, `Spor gündemi yine sıcak.`, { tid: fid }]); }
       if (Math.random() < .08 && s.my.apps >= 3) { const [mh, mid] = this.pickT('me', [`${FBU.ek(p.short, 'gen')} yeni saç modeli sosyal medyada gündem oldu`, `${p.short} antrenmandan sonra 200 frikik çalıştı, malzemeci topları toplayamadı`, `Taraftarlar ${p.short} için yeni bir tezahürat besteledi`, `${p.short} çocuk taraftara forma hediye etti, o anlar viral oldu`]); out.push(['magazin', 0, mh, `${us0} kampından renkli kareler.`, { tid: mid }]); }
       // the big foreign leagues
       const nt = Math.random() < .6 ? this.notes.slice(0, 1) : []; this.notes = [];
@@ -712,7 +712,7 @@ function Futbol(host) {
     return `<table class="fb-tbl"><tr><th>#</th><th class="l">Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>AV</th><th>P</th><th class="fm">Form</th></tr>${ord.map((i, k) => {
       const r = tabArr[i], t = FBT.team(lg + ':' + i), fm = ((C.s.form || {})[lg + ':' + i] || '').slice(-5), z = k < a ? 'ucl' : k < a + b ? 'uel' : k < a + b + c ? 'uecl' : '';
       return `<tr class="${hi === i ? 'me' : ''}"><td class="z ${z}">${k + 1}</td><td class="l">${FBT.badge(t, 16)} ${esc(t.name)}</td><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4] - r[5]}</td><td><b>${r[1] * 3 + r[2]}</b></td><td class="fm"><span class="fb-fm">${[...fm].map(c => `<i class="${c}"></i>`).join('')}</span></td></tr>`;
-    }).join('')}</table><div class="fb-leg"><span class="z ucl"></span>Şampiyonlar Ligi <span class="z uel"></span>Avrupa Ligi <span class="z uecl"></span>Konferans Ligi <small>(gelecek sezon)</small></div>`;
+    }).join('')}</table><div class="fb-leg"><span class="z ucl"></span>${FB_CUPS.ucl[0]} <span class="z uel"></span>${FB_CUPS.uel[0]} <span class="z uecl"></span>${FB_CUPS.uecl[0]} <small>(gelecek sezon)</small></div>`;
   }
   // Shared league filter: one state (sub.lgView) used by the standings and every statistics category
   const viewLg = () => (sub.lgView && FBT.league(sub.lgView)) ? sub.lgView : C.s.lg;
@@ -720,7 +720,7 @@ function Futbol(host) {
   const lgSelect = v => `<select class="fb-sel" data-a="lgsel">${FB_LEAGUES.map(L => `<option value="${L.id}" ${L.id === v ? 'selected' : ''}>${L.flag} ${esc(L.name)}${L.id === C.s.lg ? ' (senin ligin)' : ''}</option>`).join('')}</select>`;
   function tabLig(el) {
     const v = viewLg(), mine = v === C.s.lg, tabArr = tabOf(v);
-    el.innerHTML = lgSelect(v) + table(v, tabArr, mine ? myIdx() : -1) + (FBT.league(v).euro[0] === 0 ? '<p class="fb-note">Rusya kulüpleri UEFA turnuvalarından men edildiği için Avrupa kotası yok.</p>' : '');
+    el.innerHTML = lgSelect(v) + table(v, tabArr, mine ? myIdx() : -1) + (FBT.league(v).euro.every(x => !x) ? '<p class="fb-note">Bu ligin kulüpleri Avrupa kupalarına katılamıyor, Avrupa kotası yok.</p>' : '');
   }
   function tabFik(el) {
     const s = C.s, F = fixtures(); let h = '<div class="fb-list">';
@@ -813,7 +813,7 @@ function Futbol(host) {
       <h4>Kayıt yedeği (JSON)</h4><p class="fb-mut">Kariyerini dosya olarak indir; başka bir cihaza, tarayıcıya veya oyunun yüklü (PWA) sürümüne taşı. İçe aktarma bu kayıt yuvasındaki kariyerin üzerine yazar.</p>
       <div class="fb-row"><button class="fb-btn ghost" data-a="exp">⬇️ Dışa aktar</button><button class="fb-btn ghost" data-a="imp">⬆️ İçe aktar</button></div>
       <h4>Eğitim</h4><p class="fb-mut">Şut, pas, top sürme ve savunma derslerini istediğin zaman tekrar oynayabilirsin.</p><div class="fb-row"><button class="fb-btn ghost" data-a="tut">🎓 Eğitimi tekrar oyna</button></div>
-      <p class="fb-note">Kulüp ve lig isimleri gerçektir; oyuncu isimleri ülkelere göre üretilir. Veriler fb_data bölümünden kolayca güncellenebilir.</p>`;
+      <p class="fb-note">Kulüp, lig ve oyuncu isimleri kurgusaldır (gerçek kulüplere gönderme yapan parodilerdir). Oyuncular her kariyerde yeniden üretilir. Veriler js/data.js dosyasından güncellenebilir.</p>`;
   }
   // Collapse repeated awards (e.g. several player-of-the-month titles) into one card with a count
   function groupTro(list) { const g = []; list.forEach(t => { const n = t.n.startsWith('Ayın Oyuncusu') ? 'Ayın Oyuncusu' : t.n, o = g.find(x => x.n === n); if (o) o.k++; else g.push({ ic: t.ic, n, k: 1 }); }); return g; }
