@@ -97,16 +97,43 @@ const FBT = {
 };
 
 /* ---------- Attribute → match effect formulas (one place, so balance is easy to tune) ----------
-   Each attribute (0-99) drives its own mechanics; values ~50 are playable, 90+ clearly better, never automatic. */
+   Attributes are 0-99. Each one owns its own mechanics, so raising it is felt in a specific situation:
+     Şut (sut)     shot accuracy (direction/height scatter) and finishing (keepers handle placed shots worse)
+     Pas (pas)     pass accuracy, growing error on long/hard passes, quality of the ball for a teammate's finish
+     Hız (hiz)     running speed with and without the ball, slide speed
+     Teknik        ball control (turning, keeping the ball close, resisting tackles), curl, clean contact off-centre and at tight angles
+     Fizik         kick strength (max ball speed), duels (shielding, 50-50 tackles, slide length, recovery)
+   Ranges are chosen so ~45 is playable and ~90 clearly better but never automatic. */
 const FBX = {
-  // Defending duel: running speed while jockeying (hız), slide speed (hız), slide length & tackle strength & recovery (fizik), clean-contact reach (teknik)
-  run: A => 4.6 + A.hiz / 100 * 2.6,
-  slideV: A => 7 + A.hiz / 100 * 1.5,
-  slideT: A => .36 + A.fizik / 100 * .14,
-  footR: A => .75 + A.teknik / 100 * .25,
-  duel: (A, oppR) => FBU.clamp(.3 + (A.fizik - oppR) / 120, .12, .6),
-  recover: A => .95 - A.fizik / 100 * .45
+  u: v => FBU.clamp((v || 50) / 100, 0, 1),
+  // ---- kicking ----
+  vmax: A => 25 + FBX.u(A.fizik) * 9,                                       // m/s at full power
+  // direction scatter, 1 standard deviation in degrees
+  shotSig: (A, pw) => (.6 + 3.4 * Math.pow(1 - FBX.u(A.sut), 1.3)) * (.7 + .6 * pw),
+  passSig: (A, pw) => (.5 + 3 * Math.pow(1 - FBX.u(A.pas), 1.3)) * (.6 + .9 * pw * pw),
+  contactSig: (A, r2) => r2 * 2.5 * (1.15 - FBX.u(A.teknik)),               // off-centre (curled/chipped) contact
+  angleSig: (A, tight) => Math.max(0, tight - .5) * 3 * (1.1 - FBX.u(A.teknik)),   // tight angle to the goal (radians beyond ~30°)
+  elevSig: (A, pw) => (.4 + 1.6 * pw) * (1.25 - FBX.u(A.teknik)) * .6,
+  curl: A => .55 + FBX.u(A.teknik) * .45,                                   // spin from off-centre contact
+  finish: (A, curled) => ((curled ? A.teknik : A.sut) - 60) / 100 * .4,     // lowers the keeper's save chance
+  // ---- carrying the ball ----
+  pace: A => 4.4 + FBX.u(A.hiz) * 3.4,                                      // dribbling speed
+  turn: A => 3.2 + FBX.u(A.teknik) * 4,                                     // rad/s turning with the ball
+  looseLead: A => .2 + (1 - FBX.u(A.teknik)) * .5,                          // how far touches push the ball ahead
+  nick: A => 1.3 - FBX.u(A.teknik),                                         // chance factor for a defender poking a loose ball
+  holdUp: A => (FBX.u(A.teknik) * .65 + FBX.u(A.fizik) * .35),             // resisting a tackle
+  // ---- defending duel ----
+  run: A => 4.6 + FBX.u(A.hiz) * 2.6,
+  slideV: A => 7 + FBX.u(A.hiz) * 1.5,
+  slideT: A => .36 + FBX.u(A.fizik) * .14,
+  footR: A => .75 + FBX.u(A.teknik) * .25,
+  duel: (A, oppR) => FBU.clamp(.3 + ((A.fizik || 50) - oppR) / 120, .12, .6),
+  recover: A => .95 - FBX.u(A.fizik) * .45,
+  // ---- teammates ----
+  assistQ: A => (A.pas || 50) / 600                                         // better final balls → teammates score more
 };
+// Standard-normal-ish noise (sum of uniforms)
+FBX.n = () => (Math.random() + Math.random() + Math.random() + Math.random() - 2) / .577;
 
 /* ---------- Central audio (all synthesized; per-sound cooldowns; 3 volume buses) ---------- */
 const FBA = (() => {

@@ -3,6 +3,8 @@ const FBC = {
   POS: { FW: 'Forvet', W: 'Kanat', AM: 'Ofansif OS', CM: 'Merkez OS', DF: 'Defans' },
   ROLE_OF: { FW: 'ST', W: 'RW', AM: 'RCM', CM: 'CM', DF: 'RCB' },
   ATTR: [['sut', 'Şut'], ['pas', 'Pas'], ['hiz', 'Hız'], ['teknik', 'Teknik'], ['fizik', 'Fizik']],
+  // What each attribute changes in a match (formulas: FBX in core.js)
+  ATTR_FX: { sut: 'Şut isabeti ve bitiricilik', pas: 'Pas isabeti, uzun paslarda hata payı, asist kalitesi', hiz: 'Koşu ve top sürme hızı, kayma hızı', teknik: 'Top kontrolü, dönüş, falso, zor açı', fizik: 'Vuruş gücü, ikili mücadele, kayarak müdahale' },
   W: { DF: { fizik: .3, pas: .25, hiz: .2, teknik: .15, sut: .1 }, FW: { sut: .35, hiz: .2, teknik: .2, fizik: .15, pas: .1 }, W: { hiz: .3, teknik: .25, sut: .2, pas: .15, fizik: .1 }, AM: { pas: .3, teknik: .3, sut: .2, hiz: .1, fizik: .1 }, CM: { pas: .35, fizik: .2, teknik: .2, sut: .15, hiz: .1 } },
   STAGES: ['Son 16', 'Çeyrek final', 'Yarı final', 'Final'],
   ovr(p) { const w = FBC.W[p.pos]; return Math.round(Object.keys(w).reduce((s, k) => s + p.attr[k] * w[k], 0)); },
@@ -747,7 +749,7 @@ function Futbol(host) {
     const p = me(), last = C.s.mine.slice(-6).reverse();
     el.innerHTML = `<div class="fb-sk"><div class="fb-skh"><span>Skill Puanı · seviye ${(p.lvl || 0) + 1}</span><b>${p.skill} / ${FBC.need(p.lvl)}</b></div><div class="fb-skb"><i style="width:${p.skill / FBC.need(p.lvl) * 100}%"></i></div>
         <div class="fb-skh"><span>Gelişim hakkı</span><b class="fb-pts">${p.up}</b></div></div>` +
-      FBC.ATTR.map(([k, l]) => { const c = FBC.cost(p.attr[k]); return `<div class="fb-att"><span>${l}</span><div class="fb-meter"><i style="width:${p.attr[k]}%"></i></div><b>${p.attr[k]}</b><button class="fb-btn sm ${p.up >= c && p.attr[k] < 99 ? 'pri' : ''}" data-a="up" data-k="${k}">+1 <small>${c} hak</small></button></div>`; }).join('') +
+      FBC.ATTR.map(([k, l]) => { const c = FBC.cost(p.attr[k]); return `<div class="fb-att"><span>${l}</span><div class="fb-meter"><i style="width:${p.attr[k]}%"></i></div><b>${p.attr[k]}</b><button class="fb-btn sm ${p.up >= c && p.attr[k] < 99 ? 'pri' : ''}" data-a="up" data-k="${k}">+1 <small>${c} hak</small></button></div><p class="fb-attfx">${FBC.ATTR_FX[k]}</p>`; }).join('') +
       `<p class="fb-mut">Genel: <b>${FBC.ovr(p)}</b> · 75 üstü her artış 2 hak ister.${p.age > 30 ? ' 30 yaşından sonra hız ve fizik her sezon biraz düşer.' : ''}</p>
       <details class="fb-help"><summary>Skill Puanı nasıl kazanılır?</summary><div class="fb-tip">Maç sonundaki reytingine göre: Çok kötü (5.3 altı) −10/−15 · Kötü (6.0 altı) −5 · Ortalama +5 · İyi (6.9+) +10 · Çok iyi (7.8+) +15 · <b>Maçın oyuncusu (MVP) +25 bonus</b>.<br>Her eşik = <b>3 gelişim hakkı</b>; ilk eşik 100 puan, sonraki her eşik <b>+5</b> puan daha fazla ister (100, 105, 110…). Artan puan sonraki eşiğe aktarılır. Reytingi goller, asistler, isabetli pas ve şutlar yükseltir; top kaybı, hatalı pas ve kaçan fırsatlar düşürür.</div></details>
       ${last.length ? `<h4>Son maçlarda kazanılan puan</h4><div class="fb-list">${last.map(m => `<div class="fb-li"><span class="grow">${esc(FBT.team(m.opp).name)}<small>${esc(m.comp)}</small></span>${m.mvp ? '<span title="MVP">🏅</span>' : ''}<span class="fb-r">${m.r.toFixed(1)}</span><b class="${m.d >= 0 ? 'fb-up' : 'fb-dn'}">${m.d >= 0 ? '+' : ''}${m.d ?? ''}</b></div>`).join('')}</div>` : ''}`;

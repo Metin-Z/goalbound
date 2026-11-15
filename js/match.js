@@ -247,7 +247,7 @@ function FBMatch(host, o) {
   // Defender speed, slide reach and tackle strength come from the user's attributes (see FBX in core.js)
   function slideTackle(ang) {
     const m = mom; if (!m || m.phase !== 'duel' || me.slide || me.stun > 0) return;
-    me.slide = { ang, t: 0, dur: FBX.slideT(A), v: FBX.slideV(A), clean: (m.looseT || 9) < .15 };   // committed while the ball was loose me.face = ang; me.st = 'tackle'; me.stT = me.slide.dur + .3; m.fing = null;
+    me.slide = { ang, t: 0, dur: FBX.slideT(A), v: FBX.slideV(A), clean: (m.looseT || 9) < (TUT ? .25 : .15) };   // committed while the ball was loose me.face = ang; me.st = 'tackle'; me.stT = me.slide.dur + .3; m.fing = null;
     FBA.play('kick', .25);
   }
   function duelStep(m, dt) {
@@ -259,14 +259,14 @@ function FBMatch(host, o) {
     const dMe = d2(c, me);
     if (!m.cut && c.cool <= 0 && dMe < 2.8 && me.y > c.y && !(me.stun > 0) && !me.slide) {
       c.cool = 1.3;
-      if (R() < (TUT ? .3 : clamp(.45 + (o.opp.r - 75) * .012, .3, .7))) { m.cut = { x: clamp(c.x + (me.x > c.x ? -1 : 1) * (5 + R() * 2), 3, 65), t: .75 }; }
+      if (R() < (TUT ? .15 : clamp(.45 + (o.opp.r - 75) * .012, .3, .7))) { m.cut = { x: clamp(c.x + (me.x > c.x ? -1 : 1) * (5 + R() * 2), 3, 65), t: .75 }; }
     }
     if (m.cut && (m.cut.t -= dt) <= 0) m.cut = null;
     const tx = m.cut ? m.cut.x : m.goalX, ty = m.cut ? c.y + 2.5 : m.goalY;
     accelMove(c, tx, ty, m.cut ? vC * 1.1 : vC, dt, 7);
     // stride: the ball is pushed ahead and collected again; it is "loose" (winnable cleanly) when far from his feet
     m.str += dt * vC * 1.75;
-    const pk = Math.max(0, Math.sin(m.str)), lead = FOOT + pk * pk * (m.cut ? .55 : 1.05), k = 1 - Math.exp(-20 * dt);
+    const pk = Math.max(0, Math.sin(m.str)), lead = FOOT + pk * pk * (m.cut ? .55 : TUT ? 1.35 : 1.05), k = 1 - Math.exp(-20 * dt);
     const bx = c.x + Math.cos(c.face) * lead, by = c.y + Math.sin(c.face) * lead;
     ball.vx = (bx - ball.x) / Math.max(dt, 1e-3) * k; ball.vy = (by - ball.y) / Math.max(dt, 1e-3) * k; ball.x += (bx - ball.x) * k; ball.y += (by - ball.y) * k; ball.z = 0;
     m.loose = lead > FOOT + .55; m.looseT = m.loose ? 0 : (m.looseT == null ? 9 : m.looseT + dt);   // short grace: the commit moment counts
@@ -276,7 +276,7 @@ function FBMatch(host, o) {
       const sl = me.slide; sl.t += dt;
       me.x = clamp(me.x + Math.cos(sl.ang) * sl.v * dt, 1, 67); me.y = clamp(me.y + Math.sin(sl.ang) * sl.v * dt, 1, 104); me.ph += dt * 3;
       const fx = me.x + Math.cos(sl.ang) * .55, fy = me.y + Math.sin(sl.ang) * .55;
-      if (!sl.hit && Math.hypot(fx - ball.x, fy - ball.y) < FBX.footR(A)) {
+      if (!sl.hit && Math.hypot(fx - ball.x, fy - ball.y) < FBX.footR(A) + (TUT ? .25 : 0)) {
         sl.hit = true;
         if (sl.clean || m.looseT < .3 || R() < FBX.duel(A, o.opp.r)) return duelWon(m);
         pop('Rakip sıyrıldı!', '#fca5a5'); c.cool = .2; FBA.play('touch');   // 50-50 lost: he rides the challenge
@@ -334,17 +334,21 @@ function FBMatch(host, o) {
   }
   // Launch vector from aim direction, power (0..1) and contact point on the ball (cx right+, cy up+, unit disc)
   function kickVec(ang, pw, cx2, cy2, noisy) {
-    const pen = mom && mom.type === 'pen', r2 = cx2 * cx2 + cy2 * cy2, sk = A.sut / 100, tk = A.teknik / 100, deg = Math.PI / 180;
-    const vmax = 25 + sk * 9, vmin = pen ? 14 : 6, v0 = (vmin + pw * (vmax - vmin)) * (1 - .18 * r2);
+    const pen = mom && mom.type === 'pen', r2 = cx2 * cx2 + cy2 * cy2, deg = Math.PI / 180;
+    const vmax = FBX.vmax(A), vmin = pen ? 14 : 6, v0 = (vmin + pw * (vmax - vmin)) * (1 - .18 * r2);
     let a = ang + cx2 * .05;   // off-centre contact starts the ball slightly opposite to its curve
     let el = (5 + pw * 4) * deg + Math.max(0, -cy2) * (26 + (1 - pw) * 14) * deg - Math.max(0, cy2) * 6 * deg;
     if (noisy) {
-      const g = () => (R() + R() + R() - 1.5) / 1.5, acc = (mom && mom.shootGuess ? sk : A.pas / 100);
-      a += g() * ((1 - acc) * .09 + pw * pw * .045 * (1.1 - acc) + r2 * .045 * (1.2 - tk));
-      el += g() * (.5 + pw * 1.2) * deg * (1.25 - tk);
+      a += FBX.n() * kickSig(pw, r2, mom && mom.shootGuess) * deg;   // accuracy: Şut for shots, Pas for passes, Teknik for contact/angle
+      el += FBX.n() * FBX.elevSig(A, pw) * deg;
     }
     el = clamp(el, .5 * deg, 50 * deg);
-    return { vx: Math.cos(a) * Math.cos(el) * v0, vy: Math.sin(a) * Math.cos(el) * v0, vz: Math.sin(el) * v0, side: -cx2 * (.55 + tk * .45), bs: -cy2 * .7 };
+    return { vx: Math.cos(a) * Math.cos(el) * v0, vy: Math.sin(a) * Math.cos(el) * v0, vz: Math.sin(el) * v0, side: -cx2 * FBX.curl(A), bs: -cy2 * .7 };
+  }
+  // Direction scatter (degrees, 1 SD) of the user's kick from the current ball spot
+  function kickSig(pw, r2, shot) {
+    const tight = Math.abs(Math.atan2(ball.x - 34, Math.max(.5, ball.y)));
+    return (shot ? FBX.shotSig(A, pw) + FBX.angleSig(A, tight) : FBX.passSig(A, pw)) + FBX.contactSig(A, r2 || 0);
   }
   // One physics step shared by the live ball, previews, receiver planning and shot detection
   function stepBall(b, h) {
@@ -433,7 +437,7 @@ function FBMatch(host, o) {
     m.mates.forEach(p => { if (p.run && !p.lane && m.phase !== 'flight' && m.recv !== p) moveTo(p, p.run.x, p.run.y, 4.2, dt); });
     if (m.phase === 'aim' && !m.res) {
       if (m.dribble) {
-        const sp = 4.4 + A.hiz / 100 * 3.4, dx = m.dribble.x - me.x, dy = m.dribble.y - me.y, l = Math.hypot(dx, dy);
+        const sp = FBX.pace(A), dx = m.dribble.x - me.x, dy = m.dribble.y - me.y, l = Math.hypot(dx, dy);
         if (l < .3) m.dribble = null; else { me.x += dx / l * sp * dt; me.y += dy / l * sp * dt; me.face = Math.atan2(dy, dx); me.ph += sp * dt * 2; if ((m.tt = (m.tt || 0) - dt) <= 0) { m.tt = .3; FBA.play('touch'); } }
       }
       defendStep(m, dt, over);
@@ -482,7 +486,7 @@ function FBMatch(host, o) {
       const reach = p === pr ? 1.05 : .85;
       if ((m.phase === 'drive' || m.t > p.react + .4) && d2(p, me) < reach && (p.cool = (p.cool || 0) - dt) <= 0) {
         p.cool = 1.1;
-        const defSk = .4 + o.opp.r / 100 * .4, mySk = (A.teknik * .65 + A.fizik * .35) / 100;
+        const defSk = .4 + o.opp.r / 100 * .4, mySk = FBX.holdUp(A);
         const pt = clamp(.28 + (defSk - mySk) * .9 - (m.dribble ? .07 : 0) + (over ? .12 : 0), .07, .55) * (TUT ? .4 : 1);
         if (R() < pt) { FBA.play('tackle'); FBA.buzz(25); pop('😖 Top kaptırıldı', '#fca5a5'); p.st = 'tackle'; p.stT = .4; attach(p); endMoment('lost'); }
         else {   // mistimed challenge: he slides past and needs time to recover
@@ -495,7 +499,7 @@ function FBMatch(host, o) {
   }
   // Carrying the ball: touches push it ahead (longer and less accurate with low technique), defenders press and can steal a loose ball
   function driveStep(m, dt) {
-    const pace = 4.4 + A.hiz / 100 * 3.4, tk = A.teknik / 100, over = m.t > m.lim;
+    const pace = FBX.pace(A), over = m.t > m.lim;
     m.hd = m.hd == null ? me.face : m.hd; m.sp = m.sp || 0;
     let want = 0, da = 0;
     if (m.fing) {   // finger position on screen → point on the pitch (follows the moving camera)
@@ -503,13 +507,13 @@ function FBMatch(host, o) {
       m.fw = { x: wx, y: wy };
       if (l > .7) { want = pace * Math.min(1, .35 + l / 4); da = Math.atan2(dy, dx) - m.hd; da = ((da + Math.PI * 3) % (Math.PI * 2)) - Math.PI; }
     } else m.fw = null;
-    const turn = (3.2 + tk * 4) * dt; m.hd += clamp(da, -turn, turn);   // turning speed depends on technique
+    const turn = FBX.turn(A) * dt; m.hd += clamp(da, -turn, turn);   // turning speed depends on technique
     m.sp = lerp(m.sp, want * (1 - Math.min(.45, Math.abs(da) / 3)), 1 - Math.exp(-6 * dt));
     me.vx = Math.cos(m.hd) * m.sp; me.vy = Math.sin(m.hd) * m.sp;
     me.x = clamp(me.x + me.vx * dt, 1, 67); me.y = clamp(me.y + me.vy * dt, 1, 104); me.face = m.hd; me.ph += m.sp * dt * 2.2;
     // the ball rides the stride: pushed a little ahead and collected again (looser with low technique)
     const prev = Math.sin(m.str || 0); m.str = (m.str || 0) + m.sp * dt * 2.2;
-    const lead = m.sp > .6 ? .45 + (.2 + (1 - tk) * .5) * (.5 + .5 * Math.sin(m.str)) : FOOT;
+    const lead = m.sp > .6 ? .45 + FBX.looseLead(A) * (.5 + .5 * Math.sin(m.str)) : FOOT;
     const bx = me.x + Math.cos(m.hd) * lead, by = me.y + Math.sin(m.hd) * lead, k = 1 - Math.exp(-22 * dt);
     ball.vx = (bx - ball.x) / Math.max(dt, 1e-3) * k; ball.vy = (by - ball.y) / Math.max(dt, 1e-3) * k; ball.x += (bx - ball.x) * k; ball.y += (by - ball.y) * k; ball.z = 0;
     if (m.sp > 1 && prev < .9 && Math.sin(m.str) >= .9) { FBA.play('touch'); me.kick = .12; m.touches = (m.touches || 0) + 1; }
@@ -518,7 +522,7 @@ function FBMatch(host, o) {
     defendStep(m, dt, over);
     if (m.res) return;
     const db = Math.hypot(ball.x - me.x, ball.y - me.y);
-    for (const p of m.defs) if (!(p.stun > 0) && db > .6 && Math.hypot(ball.x - p.x, ball.y - p.y) < .7 && R() < dt * 5 * (1.3 - tk)) { FBA.play('tackle'); pop('😖 Rakip topu dürttü', '#fca5a5'); p.face = Math.atan2(ball.y - p.y, ball.x - p.x); attach(p); endMoment('lost'); return; }
+    for (const p of m.defs) if (!(p.stun > 0) && db > .6 && Math.hypot(ball.x - p.x, ball.y - p.y) < .7 && R() < dt * 5 * FBX.nick(A)) { FBA.play('tackle'); pop('😖 Rakip topu dürttü', '#fca5a5'); p.face = Math.atan2(ball.y - p.y, ball.x - p.x); attach(p); endMoment('lost'); return; }
     if (m.auto && Tz0()) { const c = cam, q = m.target; m.fing = { x: (q.x - c.x) * c.s + W / 2, y: (q.y - c.y) * c.s + H / 2 }; }   // auto-carry follows the camera
     const Tz = m.target;
     if (Math.hypot(ball.x - Tz.x, ball.y - Tz.y) < Tz.r) {   // reached the zone → pass or shoot
@@ -566,7 +570,7 @@ function FBMatch(host, o) {
     mom.wait = .4;   // short touch, then the teammate shoots
     mom.finish = () => {
       if (!mom || mom.res) return;
-      const pg = clamp(.33 + (22 - p.y) / 38 + (o.my.r - o.opp.r) / 90 + A.pas / 600, .18, .78), goalIt = R() < pg;
+      const pg = clamp(.33 + (22 - p.y) / 38 + (o.my.r - o.opp.r) / 90 + FBX.assistQ(A), .18, .78), goalIt = R() < pg;
       const tx = goalIt ? (R() < .5 ? GX0 + .5 + R() : GX1 - .5 - R()) : (R() < .5 ? GK1.x : (R() < .5 ? GX0 - 1.5 : GX1 + 1.5));
       const ang = Math.atan2(-.2 - p.y, tx - p.x); p.face = ang; p.kick = .3; mom.kickM = Math.round(Math.hypot(p.x - 34, p.y));
       ball.x = p.x + Math.cos(ang) * FOOT; ball.y = p.y + Math.sin(ang) * FOOT; ball.own = null; ball.phys = true;
@@ -575,7 +579,7 @@ function FBMatch(host, o) {
     };
   }
   // Finishing quality: a developed striker places and strikes shots that keepers handle worse
-  const finishQ = () => (mom && (mom.type === 'fk' || Math.abs(ball.side) > .25) ? (A.teknik - 60) : (A.sut - 60)) / 100 * .4;
+  const finishQ = () => FBX.finish(A, !!(mom && (mom.type === 'fk' || Math.abs(ball.side) > .25)));
   function gkReact(dt) {
     const g = GK1;
     if (g.dive && g.dive.early) { if (!g.dived) { g.dived = true; g.st = 'dive'; g.stT = .8; g.ddir = Math.sign(g.dive.x - g.x) || 0; } g.x = lerp(g.x, g.dive.x, dt * 5); return; }
@@ -858,6 +862,10 @@ function FBMatch(host, o) {
     cx.fillStyle = 'rgba(255,255,255,.8)'; cx.beginPath(); cx.arc(bx + dx, by + dy, 7, 0, 7); cx.fill();
     if (!ok) { label('Daha fazla çek', bx, by - 34, '#fca5a5'); return; }
     const col = pw < .5 ? '#86efac' : pw < .8 ? '#fde047' : '#f87171', v = kickVec(ang, pw, 0, 0, false), path = simPath(v, ball.x, ball.y, 2.2, 1 / 30);
+    // accuracy cone: ±1.5 SD of the direction scatter (narrows as Şut / Pas improve)
+    const sig = kickSig(pw, 0, isShot(path)) * Math.PI / 180 * 1.5, cl = Math.min(260, 60 + pw * 200);
+    cx.fillStyle = 'rgba(255,255,255,.10)'; cx.beginPath(); cx.moveTo(bx, by); cx.arc(bx, by, cl, ang - sig, ang + sig); cx.closePath(); cx.fill();
+    cx.strokeStyle = 'rgba(255,255,255,.35)'; cx.lineWidth = 1; cx.beginPath(); cx.moveTo(bx, by); cx.lineTo(bx + Math.cos(ang - sig) * cl, by + Math.sin(ang - sig) * cl); cx.moveTo(bx, by); cx.lineTo(bx + Math.cos(ang + sig) * cl, by + Math.sin(ang + sig) * cl); cx.stroke();
     cx.fillStyle = col;
     path.forEach((q, i) => { if (i % 2) return; const [px, py] = W2S(q.x, q.y); cx.globalAlpha = Math.max(.15, 1 - i / path.length); cx.beginPath(); cx.arc(px, py - q.z * cam.s * .9, 3, 0, 7); cx.fill(); });
     cx.globalAlpha = 1;
