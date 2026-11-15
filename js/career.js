@@ -505,7 +505,7 @@ function Futbol(host) {
   const avatar = (p, kit, back, w = 110) => { const cv = document.createElement('canvas'); cv.width = 200; cv.height = 300; cv.style.width = w + 'px'; cv.style.height = w * 1.5 + 'px'; fbAvatar(cv, p.look, kit, p.num, p.short, back); return cv; };
 
   function renderTitle() {
-    let html = `<div class="fb-hero gb-hero"><svg class="gb-pitch" viewBox="0 0 200 120" aria-hidden="true"><path d="M0 119h200M60 119v-38h80v38M82 119v-16h36v16M70 81a30 30 0 0 0 60 0"/><circle cx="100" cy="0" r="26"/><path d="M0 0h200"/></svg><h1 class="gb-word"><span>GOAL</span><em>BOUND</em></h1><p>Oyuncunu yarat, Süper Lig'den başla, Avrupa'yı fethet.</p></div><div class="fb-slots">`;
+    let html = `<div class="fb-hero gb-hero"><svg class="gb-pitch" viewBox="0 0 200 120" aria-hidden="true"><path d="M0 119h200M60 119v-38h80v38M82 119v-16h36v16M70 81a30 30 0 0 0 60 0"/><circle cx="100" cy="0" r="26"/><path d="M0 0h200"/></svg><h1 class="gb-word"><span>GOAL</span><em>BOUND</em></h1><p>Oyuncunu yarat, İstediğin ligden başla, Avrupa'yı fethet.</p></div><div class="fb-slots">`;
     for (let n = 0; n < 3; n++) {
       const raw = localStorage.getItem(FBS.key(n)) || localStorage.getItem(FBS.key(n) + '_b'), d = FBS.read(n);
       if (d) {
@@ -545,7 +545,10 @@ function Futbol(host) {
       h += `<p class="fb-mut">Dağıtılacak puan: <b class="fb-pts">${d.pts}</b> · En fazla 70</p>` + FBC.ATTR.map(([k, l]) => `<div class="fb-att"><span>${l}</span><button class="fb-btn sm" data-a="at-" data-k="${k}">−</button><div class="fb-meter"><i style="width:${d.attr[k]}%"></i></div><b>${d.attr[k]}</b><button class="fb-btn sm" data-a="at+" data-k="${k}">+</button></div>`).join('') +
         `<p class="fb-mut">Genel: <b>${FBC.ovr(d)}</b> · ${FBC.POS[d.pos]} için en önemli: ${Object.entries(FBC.W[d.pos]).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => FBC.ATTR.find(x => x[0] === k)[1]).join(', ')}</p>`;
     } else {
-      h += `<p class="fb-mut">Kariyerine başlayacağın Süper Lig kulübünü seç:</p><div class="fb-teams">` + FBT.ids('tr').map(id => { const t = FBT.team(id); return `<button class="fb-team ${d.club === id ? 'on' : ''}" data-a="club" data-v="${id}">${FBT.badge(t, 30)}<span>${esc(t.name)}</span><small>${'★'.repeat(clamp(Math.round((t.r - 58) / 6), 1, 5))}</small></button>`; }).join('') + `</div>`;
+      // Any league, any club: pick the league first, then a club from it
+      const lg = d.lg || (d.club ? lgOf(d.club) : 'tr'), L = FBT.league(lg);
+      h += `<p class="fb-mut">Önce ligini, sonra kulübünü seç:</p><div class="fb-lgs">${FB_LEAGUES.map(X => `<button class="fb-lg ${X.id === lg ? 'on' : ''}" data-a="lg" data-v="${X.id}"><i>${X.flag}</i><span>${esc(X.country)}</span></button>`).join('')}</div>
+        <h4 class="fb-lgh">${L.flag} ${esc(L.name)} · ${esc(L.country)} <small>${L.teams.length} kulüp${L.euro[0] + L.euro[1] + L.euro[2] ? ` · Avrupa: ilk ${L.euro[0] + L.euro[1] + L.euro[2]}` : ' · Avrupa kupası yok'}</small></h4><div class="fb-teams">` + FBT.ids(lg).map(id => { const t = FBT.team(id); return `<button class="fb-team ${d.club === id ? 'on' : ''}" data-a="club" data-v="${id}">${FBT.badge(t, 30)}<span>${esc(t.name)}</span><small>${'★'.repeat(clamp(Math.round((t.r - 58) / 6), 1, 5))}</small></button>`; }).join('') + `</div>`;
     }
     h += `</div></div><div class="fb-nav">${st > 0 ? '<button class="fb-btn ghost" data-a="prev">‹ Geri</button>' : '<span></span>'}<button class="fb-btn pri" data-a="next">${st < 3 ? 'İleri ›' : '✔ Kariyere başla'}</button></div>`;
     main.innerHTML = h;
@@ -559,7 +562,8 @@ function Futbol(host) {
       else if (a === 'look') { d.look[b.dataset.k] = +b.dataset.v; FBA.play('ui'); }
       else if (a === 'flip') { sub.flip = !sub.flip; FBA.play('ui'); }
       else if (a === 'at+' || a === 'at-') { const k = b.dataset.k; if (a === 'at+' && d.pts > 0 && d.attr[k] < 70) { d.attr[k]++; d.pts--; FBA.play('ui'); } else if (a === 'at-' && d.attr[k] > 40) { d.attr[k]--; d.pts++; FBA.play('ui'); } else { FBA.play('back'); return; } }
-      else if (a === 'club') { d.club = b.dataset.v; FBA.play('confirm'); sub.flip = true; }
+      else if (a === 'lg') { if (d.lg !== b.dataset.v) { d.lg = b.dataset.v; if (d.club && lgOf(d.club) !== d.lg) d.club = null; } FBA.play('ui'); }
+      else if (a === 'club') { d.club = b.dataset.v; d.lg = lgOf(d.club); FBA.play('confirm'); sub.flip = true; }
       else if (a === 'prev') { sub.step--; FBA.play('back'); }
       else if (a === 'next') {
         if (st === 0) { d.first = d.first.trim(); d.last = d.last.trim(); if (!d.first || !d.last) { toast('Ad ve soyad gir'); FBA.play('back'); return; } d.short = (d.short.trim() || d.last).slice(0, 12); }

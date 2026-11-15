@@ -291,3 +291,10 @@ button.fb-li:active,.fb-chip:active,.fb-team:active,.fb-hl:active,.fb-king:activ
 .fbm-tut b:first-child{display:block;color:var(--acc,#ffd400);letter-spacing:.06em;font-size:13px;margin-bottom:4px}
 .fbm-tut p{margin:0;font-size:14px;line-height:1.45}
 .fbm-tutn{font-size:12px;opacity:.75;margin:0 0 10px}
+
+/* League picker (career start) */
+.fb-lgs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0 10px}
+.fb-lg{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid transparent;text-align:left;font-size:12px;font-weight:700;min-width:0}
+.fb-lg i{font-style:normal;font-size:16px}.fb-lg span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fb-lg.on{border-color:var(--acc,#ff7a1a);background:rgba(255,255,255,.12)}
+.fb-lgh{margin:4px 0 8px;font-size:14px}.fb-lgh small{display:block;font-weight:500;opacity:.7;font-size:11px;margin-top:2px}
