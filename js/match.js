@@ -1325,7 +1325,7 @@ function FBMatch(host, o) {
   window.addEventListener('resize', resize); if (window.visualViewport) visualViewport.addEventListener('resize', resize);   // iOS toolbars / rotation
   resize(); scoreUI(); refreshRating(); attach(T0.find(p => p.role === 'ST' && p !== me) || T0[6]);
   if (TUT) { showTicker(false); FBA.crowdLevel(.12); tutCard('⚽ Antrenman sahası', TUT_STEPS[0], `<p class="fbm-tutn">5 kısa ders · her dersi geçince sıradakine geçersin</p><button class="fbm-btn pri" data-a="tgo">Başla ▶</button>`); }
-  else { feed(o.resume ? `⏯ ${Math.floor(st.min)}. dakikadan devam ediliyor` : `▶ 1' Hakem başlama düdüğünü çaldı`, 'mut'); FBA.play('whistle', 'long'); FBA.crowdLevel(.3); }
+  else { feed(o.subIn ? `🔁 ${o.subIn}' Oyuna girdin! Skor ${st.sc[0]}-${st.sc[1]}` : o.resume ? `⏯ ${Math.floor(st.min)}. dakikadan devam ediliyor` : `▶ 1' Hakem başlama düdüğünü çaldı`, o.subIn ? 'me' : 'mut'); FBA.play('whistle', 'long'); FBA.crowdLevel(.3); }
   raf = requestAnimationFrame(tick);
   return { _cam: cam, _wh: () => [W, H], _all: ALL, _zoom: zoom, _gk: GK1, _step: dt => update(dt), _c3: c3, _kv: kickVec, _sim: simPath, _setContact: (x, y) => setContact(x, y), _enterContact: enterContact, destroy, pause() { if (!st.ended && !st.paused) $('.fbm-pause').click(); }, _st: st, _simRest: simRest, get mom() { return mom; }, _kick: userKick, _me: me, _ball: ball, _enter: enterScene, _slide: slideTackle, _poke: pokeTackle, get tut() { return TUT; } };
 }

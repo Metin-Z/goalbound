@@ -307,3 +307,6 @@ button.fb-li:active,.fb-chip:active,.fb-team:active,.fb-hl:active,.fb-king:activ
 .fb-top{padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right))}
 .fb-main{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
 .fb-bnav{padding-left:max(4px,env(safe-area-inset-left));padding-right:max(4px,env(safe-area-inset-right))}
+
+.fb-sel-st{margin:10px 0;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);font-size:13.5px;line-height:1.4}.fb-sel-st small{display:block;opacity:.7;margin-top:3px}.fb-sel-st.on{border-color:rgba(74,222,128,.45)}.fb-sel-st.sub{border-color:rgba(253,224,71,.5)}.fb-sel-st.bench{border-color:rgba(248,113,113,.5)}
+.fb-xib{margin-top:6px;padding-top:6px;border-top:1px dashed rgba(255,255,255,.2);opacity:.85}

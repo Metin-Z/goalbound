@@ -271,7 +271,7 @@ function Futbol(host) {
     const F = fixtures(), lg = s.lg;
     s.res.forEach((round, r) => { if (!round) return; F[r].forEach(([h, a], i) => {
       const [gh, ga] = round[i], mineH = h === myIdx(), mineA = a === myIdx();
-      if (mineH || mineA) { const m = s.mine.find(x => x.comp && s.cal[x.wk] && s.cal[x.wk].k === 'L' && s.cal[x.wk].r === r) || { g: 0, a: 0 }; psAdd('ME', 0); psAdd('ME', 1, m.g); psAdd('ME', 2, m.a); creditTeam(C.club, Math.max(0, (mineH ? gh : ga) - m.g), null); creditTeam(lg + ':' + (mineH ? a : h), mineH ? ga : gh, null); }
+      if (mineH || mineA) { const m = s.mine.find(x => x.comp && s.cal[x.wk] && s.cal[x.wk].k === 'L' && s.cal[x.wk].r === r) || { g: 0, a: 0 }; if (!m.dnp) psAdd('ME', 0); psAdd('ME', 1, m.g || 0); psAdd('ME', 2, m.a || 0); creditTeam(C.club, Math.max(0, (mineH ? gh : ga) - m.g), null); creditTeam(lg + ':' + (mineH ? a : h), mineH ? ga : gh, null); }
       else { creditTeam(lg + ':' + h, gh, null); creditTeam(lg + ':' + a, ga, null); }
     }); });
   }
@@ -280,6 +280,22 @@ function Futbol(host) {
   const tn = id => FBT.team(id).name, pickR = a => a[(Math.random() * a.length) | 0];
   function coach(club) { const t = FBT.team(club), N = FB_NAMES[t.lg.nat] || FB_NAMES.world, r = FBU.rng('coach' + club), f = N[0].split(','), l = N[1].split(','); return f[(r() * f.length) | 0] + ' ' + l[(r() * l.length) | 0]; }
   function derbyOf(a, b) { const d = FB_DERBY.find(([p, q]) => (p === a && q === b) || (p === b && q === a)); return d ? d[2] : null; }
+  // Commentators: three per league (play-by-play, analyst, studio), drawn once per career from that league's
+  // own name pools, never repeated across leagues, kept in the save (C.cms)
+  function pundits(lg) {
+    if (!C.cms) C.cms = {};
+    if (!C.cms[lg]) {
+      const used = new Set(Object.values(C.cms).flat());
+      FB_LEAGUES.forEach(L => {
+        if (C.cms[L.id]) return;
+        const r = FBU.rng('cm' + (C.created || '') + L.id), N = FB_NAMES[L.nat] || FB_NAMES.world, f = N[0].split(','), l = N[1].split(','), out = [];
+        for (let k = 0; out.length < 3 && k < 200; k++) { const ln = l[(r() * l.length) | 0], n = f[(r() * f.length) | 0] + ' ' + ln; if (!used.has(n) && !out.some(x => x.endsWith(' ' + ln))) { used.add(n); out.push(n); } }
+        C.cms[L.id] = out;
+      });
+    }
+    return C.cms[lg];
+  }
+  const PN = () => pundits(C.s ? C.s.lg : lgOf(C.club));
   const MEDIA = {
     big: ['en', 'es', 'it', 'de', 'fr'], notes: [],
     // Add a news item unless the same headline (or the same template, via extra.tid) ran recently
@@ -313,7 +329,7 @@ function Futbol(host) {
       else if (us.g === 2) out.push(['oyuncu', 2, pickR([`${p.first} ${p.last} şov yaptı: 2 gol!`, `Çifte vuruş: ${p.short} ${FBU.ek(op0, 'dat')} iki gol attı`, `${p.short} gecesi: ${op0} karşısında 2 gol`]), `${tn(H)} ${sc} ${tn(A)} maçında ${p.short} ağları ${us.g} kez havalandırdı.`]);
       else if (us.a >= 2) out.push(['oyuncu', 2, `Asist makinesi ${p.short}: ${us.a} gol pası`, `${tn(H)} ${sc} ${tn(A)} maçında oyunun beyniydi.`]);
       else if (us.r >= 8.3) { const [gh2, gid] = this.pickT('pg', [`${p.short} sahada parladı: reyting ${us.r.toFixed(1)}`, `Yorumcular ${FBU.ek(p.short, 'dat')} tam not verdi`, `${p.short} gecenin yıldızıydı`]); out.push(['oyuncu', 1, gh2, `${tn(H)} ${sc} ${tn(A)} maçında ${us.r.toFixed(1)} reytingle sahanın en iyilerindendi.`, { tid: gid }]); }
-      else if (us.r <= 5.4) { const [ch, cid] = this.pickT('pb', [`Rıza Mikrofon: "${p.short} bugün sahada yoktu"`, `${FBU.ek(p.short, 'dat')} sert eleştiri: "Bu formayı terletmedi"`, `Hoca Taktikçi: "${p.short} pozisyon bilgisini evde unutmuş"`, `${p.short} için kara gece: reyting ${us.r.toFixed(1)}`]); out.push(['magazin', 1, ch, `${tn(H)} ${sc} ${tn(A)} maçındaki performansı yorumcuların hedefinde. Bir sonraki maçta yanıt bekleniyor.`, { tid: cid }]); }
+      else if (us.r <= 5.4) { const [ch, cid] = this.pickT('pb', [`${PN()[0]}: "${p.short} bugün sahada yoktu"`, `${FBU.ek(p.short, 'dat')} sert eleştiri: "Bu formayı terletmedi"`, `${PN()[1]}: "${p.short} pozisyon bilgisini evde unutmuş"`, `${p.short} için kara gece: reyting ${us.r.toFixed(1)}`]); out.push(['magazin', 1, ch, `${tn(H)} ${sc} ${tn(A)} maçındaki performansı yorumcuların hedefinde. Bir sonraki maçta yanıt bekleniyor.`, { tid: cid }]); }
       // our coach after the match
       if (Math.random() < .5) { const [qh, qid] = this.pickT('c' + (mg > 0 ? 'w' : mg < 0 ? 'l' : 'd') + (us.r >= 7.8 ? 'p' : us.r <= 5.6 ? 'n' : ''), mg > 0 ? (us.r >= 7.8 ? [`"${p.short} bugün ayrı bir seviyedeydi"`, `"${p.short} gibi bir oyuncuyu çalıştırmak keyif"`] : [`"Takım ruhu buydu, çocuklarımı kutluyorum"`, `"Üç puan önemli ama daha iyi oynayabiliriz"`, `"Plan tuttu, oyuncular uyguladı"`]) : mg < 0 ? (us.r <= 5.6 ? [`"${p.short} daha fazlasını yapabilir, ona güveniyorum"`, `"Bazı oyuncularım bugün bekleneni veremedi"`] : [`"Sonuç acı ama başımız dik"`, `"Hatalarımızdan ders çıkaracağız"`, `"Hakem kararlarını yorumlamayacağım"`]) : [`"Bir puan da puandır"`, `"Kazanmak istedik, olmadı"`, `"Rakibi tebrik ediyorum"`]); out.push(['takim', 0, `${cc}: ${qh}`, `${FBU.ek(us0, 'gen')} teknik direktörü maç sonu basın toplantısında konuştu.`, { tid: qid }]); }
       // teammates
@@ -361,7 +377,7 @@ function Futbol(host) {
       if (Math.random() < .22) { const lg = pickR(this.big), top = leaders(1, lg)[0], bigs = FBT.all().filter(id => FBT.team(id).r >= 84 && (!top || !id.startsWith(lg))); if (top && bigs.length) { const w = who(top.k); out.push(['takim', 0, `Transfer kulisi: ${w.name} için ${tn(pickR(bigs))} devrede`, `${tn(w.club)} formasıyla ${top.v} gol atan yıldız için ilk temasların kurulduğu konuşuluyor.`]); } }
       const avg = s.my.apps ? s.my.rs / s.my.apps : 0;
       if (s.my.apps >= 5 && avg >= 7 && Math.random() < .15) { const c = FBT.all().filter(id => id !== C.club && FBT.team(id).r >= club().r); if (c.length) out.push(['oyuncu', 1, `Kulis: ${tn(pickR(c))}, ${FBU.ek(p.short, 'acc')} izlemeye aldı`, `Ortalama ${avg.toFixed(2)} reytingle oynayan genç yeteneğin menajeriyle görüşüldüğü iddia edildi.`]); }
-      if (r % 3 === 2) { const g = leaders(1)[0], worst = s.lg + ':' + ord[ord.length - 1]; if (g && Math.random() < .5) { const w = who(g.k); out.push(['magazin', 0, `Hoca Taktikçi: "${w.name.split(' ').slice(-1)[0]} topa bakınca top utanıyor"`, `Ünlü yorumcu, ${g.v} gollü ${w.name} için övgüler yağdırdı.`]); } else out.push(['magazin', 0, `Hoca Taktikçi'den ${FBU.ek(tn(worst), 'dat')} sert eleştiri`, `"Bu savunmayla değil şampiyonluk, mahalle turnuvası bile zor" dedi. Kulüp cephesinden yanıt gecikmedi.`]); }
+      if (r % 3 === 2) { const g = leaders(1)[0], worst = s.lg + ':' + ord[ord.length - 1]; if (g && Math.random() < .5) { const w = who(g.k); out.push(['magazin', 0, `${PN()[1]}: "${w.name.split(' ').slice(-1)[0]} topa bakınca top utanıyor"`, `Ünlü yorumcu, ${g.v} gollü ${w.name} için övgüler yağdırdı.`]); } else out.push(['magazin', 0, `${FBU.ek(PN()[1], 'abl')} ${FBU.ek(tn(worst), 'dat')} sert eleştiri`, `"Bu savunmayla değil şampiyonluk, mahalle turnuvası bile zor" dedi. Kulüp cephesinden yanıt gecikmedi.`]); }
       if (Math.random() < .3) { const c = s.lg + ':' + ((Math.random() * s.tab.length) | 0), sq = FBT.squad(c).filter(x => x.role !== 'GK'), pl = pickR(sq).name, gk = FBT.squad(c)[0].name;
         out.push(['magazin', 0, pickR([`${pl} antrenmana ters formayla çıktı, 20 dakika kimse fark etmedi`, `${tn(c)} kalecisi ${gk}: "Eldivenlerimi buzdolabında saklıyorum, serin eller topu tutar"`, `${tn(c)} otobüsü stadı bulamadı, maça 3 dakika kala yetişti`, `${pl} gol sevinci için tribünden dans hocası tuttuğunu itiraf etti`, `${tn(c)} maskotu kale arkasında uyuyakaldı, kameralar yakaladı`, `${pl}: "Penaltıdan önce annemi aradım, sağ köşe dedi"`]), `${tn(c)} cephesi olayı gülerek karşıladı.`]); }
       // Europe: title races, star milestones and injuries in the big leagues
@@ -370,7 +386,7 @@ function Futbol(host) {
       this.big.filter(x => s.o[x]).forEach(lg => { const t1 = leaders(1, lg)[0]; if (!t1) return; const ms = [30, 25, 20, 15, 10].find(m => t1.v >= m), fk = 'ms' + lg + ms; if (ms && !s.flags[fk]) { s.flags[fk] = 1; const w = who(t1.k); out.push(['dunya', ms >= 20 ? 1 : 0, `${FBT.league(lg).flag} ${w.name} ${ms} gole ulaştı`, `${tn(w.club)} forması giyen golcü ${FBU.ek(FBT.league(lg).name, 'loc')} gol krallığı yarışında başı çekiyor.`]); } });
       if (Math.random() < .12) { const lg = pickR(this.big.filter(x => s.o[x])), cand = lg ? leaders(3, lg).slice(0, 8) : []; if (cand.length) { const x = pickR(cand), w = who(x.k), wk = 2 + ((Math.random() * 5) | 0); (s.inj || (s.inj = {}))[x.k] = wk; out.push(['dunya', 0, `${FBT.league(lg).flag} ${FBU.ek(tn(w.club), 'dat')} şok: ${w.name} ${wk} hafta yok`, `Yıldız oyuncunun sakatlığı ${FBU.ek(FBT.league(lg).name, 'gen')} dengelerini değiştirebilir.`]); } }
       if (Math.random() < .1) { const lg = pickR(this.big), tA = leaders(2, lg)[0], dest = FBT.all().filter(id => FBT.team(id).r >= 86); if (tA && dest.length) { const w = who(tA.k), d2 = pickR(dest.filter(id => id !== w.club)); out.push(['dunya', 0, `${FBT.league(lg).flag} Transfer bombası: ${w.name}, ${FBU.ek(tn(d2), 'gen')} radarında`, `${tA.v} asistlik oyun kurucu için dev bir teklifin hazırlandığı konuşuluyor.`]); } }
-      if (Math.random() < .14) { const dd = FB_DERBY.filter(([a]) => a.startsWith(s.lg + ':')); const d = dd.length ? pickR(dd) : pickR(FB_DERBY), d0 = tn(d[0]), d1 = tn(d[1]); const [fh, fid] = this.pickT('fx', [`Rıza Mikrofon ile Hoca Taktikçi canlı yayında ${d[2]} yüzünden birbirine girdi`, `${d0} taraftarı ${d1} maçı öncesi şehre dev pankart astı`, `${d1} başkanı: "${d0} bizden korkuyor"`, `Yorumcu masasında kahve döküldü: tartışma ${d[2]} üzerineydi`]); out.push(['magazin', 0, fh, `Spor gündemi yine sıcak.`, { tid: fid }]); }
+      if (Math.random() < .14) { const dd = FB_DERBY.filter(([a]) => a.startsWith(s.lg + ':')); const d = dd.length ? pickR(dd) : pickR(FB_DERBY), d0 = tn(d[0]), d1 = tn(d[1]); const [fh, fid] = this.pickT('fx', [`${PN()[0]} ile ${PN()[1]} canlı yayında ${d[2]} yüzünden birbirine girdi`, `${d0} taraftarı ${d1} maçı öncesi şehre dev pankart astı`, `${d1} başkanı: "${d0} bizden korkuyor"`, `Yorumcu masasında kahve döküldü: tartışma ${d[2]} üzerineydi`]); out.push(['magazin', 0, fh, `Spor gündemi yine sıcak.`, { tid: fid }]); }
       if (Math.random() < .08 && s.my.apps >= 3) { const [mh, mid] = this.pickT('me', [`${FBU.ek(p.short, 'gen')} yeni saç modeli sosyal medyada gündem oldu`, `${p.short} antrenmandan sonra 200 frikik çalıştı, malzemeci topları toplayamadı`, `Taraftarlar ${p.short} için yeni bir tezahürat besteledi`, `${p.short} çocuk taraftara forma hediye etti, o anlar viral oldu`]); out.push(['magazin', 0, mh, `${us0} kampından renkli kareler.`, { tid: mid }]); }
       // the big foreign leagues
       const nt = Math.random() < .6 ? this.notes.slice(0, 1) : []; this.notes = [];
@@ -427,7 +443,7 @@ function Futbol(host) {
       rr.forEach(([h, a, gh, ga]) => FBC.addRes(s.tab, h, a, gh, ga)); s.res[f.e.r] = rr.map(x => [x[2], x[3]]);
       rr.forEach(([h, a, gh, ga]) => { if (h === myIdx() || a === myIdx()) return; creditTeam(s.lg + ':' + h, gh, null); creditTeam(s.lg + ':' + a, ga, null); });
       const lg0 = (res.log || []).filter(e => e.side === 0), lg1 = (res.log || []).filter(e => e.side === 1);
-      psAdd('ME', 0); const ourSc = creditTeam(C.club, 0, lg0) || []; creditTeam(f.opp, 0, lg1);
+      if (!res.dnp) psAdd('ME', 0); const ourSc = creditTeam(C.club, 0, lg0) || []; creditTeam(f.opp, 0, lg1);
       // goals without a log line (rare: older sims) still count for someone
       for (let i = lg0.length; i < res.sc[0]; i++) psAdd(C.club + '|' + wpick(GW, [myRole()]), 1);
       for (let i = lg1.length; i < res.sc[1]; i++) psAdd(f.opp + '|' + wpick(GW, []), 1);
@@ -446,14 +462,28 @@ function Futbol(host) {
       else if (f.e.st === 3) { C.tro.push({ y: s.year, n: FB_CUPS[f.cup][0], ic: '🏆' }); news(`🏆 ${FB_CUPS[f.cup][0]} ŞAMPİYONU!`); }
       else news(`✅ ${FB_CUPS[f.cup][0]}: ${FBC.STAGES[f.e.st + 1]}'e yükseldik`);
     }
-    // Player stats + progression
+    // Player stats + progression (skipped when the player stayed on the bench all match)
+    const sel = C.sel && C.sel.wk === s.wk && C.sel.y === s.year ? C.sel : { st: 'start', min: 0 };
+    C.benchRun = sel.st === 'start' ? 0 : (C.benchRun || 0) + 1;
+    if (res.dnp) {
+      my.dnp = (my.dnp || 0) + 1; C.tot.dnp = (C.tot.dnp || 0) + 1;
+      s.mine.push({ wk: s.wk, opp: f.opp, home: f.home, sc: res.sc.slice(), r: null, g: 0, a: 0, comp: f.comp, pen, sim: true, dnp: true, d: 0 });
+      news(`🪑 ${FBT.team(f.opp).name} maçında kulübedeydin, süre almadın (${res.sc[0]}-${res.sc[1]})`);
+      s.wk++; const lr0 = s.cal.filter(x => x.k === 'L').length;
+      if (f.e.k === 'L' && f.e.r === Math.floor(lr0 / 2) - 1) midSeason();
+      C.live = null; C.sel = null; sub.last = { f, res, pen, win, dnp: true };
+      if (!nextFix()) seasonEnd();
+      save(); return;
+    }
+    const subMin = sel.st === 'sub' ? sel.min : 0;
+    my.mins = (my.mins || 0) + 90 - subMin; C.tot.mins = (C.tot.mins || 0) + 90 - subMin; if (subMin) { my.subs = (my.subs || 0) + 1; C.tot.subs = (C.tot.subs || 0) + 1; }
     // Performance-based skill points (can go down); MVP adds a big bonus
     const band = FBC.band(us.r), best = FBC.bestOther(res, C.club, f.opp), mvp = us.r >= best.r;
     const delta = band.d + (mvp ? 25 : 0), before = p.skill, gained = FBC.addSkill(p, delta);
     my.apps++; my.g += us.g; my.a += us.a; my.rs += us.r; if (mvp) my.motm++;
     C.tot.apps++; C.tot.g += us.g; C.tot.a += us.a; C.tot.rs += us.r;
     const gd = (us.gd || []).slice(), far = gd.length ? Math.max(...gd) : 0;
-    s.mine.push({ wk: s.wk, opp: f.opp, home: f.home, sc: res.sc.slice(), r: us.r, g: us.g, a: us.a, comp: f.comp, pen, sim: !!res.sim, mvp, d: delta, gd });
+    s.mine.push({ wk: s.wk, opp: f.opp, home: f.home, sc: res.sc.slice(), r: us.r, g: us.g, a: us.a, comp: f.comp, pen, sim: !!res.sim, mvp, d: delta, gd, sub: subMin || undefined });
     if (far) { if (far > (my.far || 0)) my.far = far; if (far > (C.tot.far || 0)) { C.tot.far = far; if (far >= 20) news(`🚀 Kariyerinin en uzak golü: ${far} metre!`); } }
     if (gained) news(`💪 ${gained} gelişim hakkı kazandın! Gelişim sekmesinden özelliklerini yükselt.`);
     if (us.g >= 3) news(`🎩 HAT-TRICK! ${p.first} ${p.last} ${FBU.ek(FBT.team(f.opp).name, 'dat')} ${us.g} gol attı`);
@@ -461,7 +491,7 @@ function Futbol(host) {
     s.wk++;
     const lr = s.cal.filter(x => x.k === 'L').length;
     if (f.e.k === 'L' && f.e.r === Math.floor(lr / 2) - 1) midSeason();
-    C.live = null;
+    C.live = null; C.sel = null;
     sub.last = { f, res, pen, win, band, mvp, best, delta, before, gained };
     if (!nextFix()) seasonEnd();
     save();
@@ -482,7 +512,7 @@ function Futbol(host) {
     if (gL[0]) { const w = who(gL[0].k); kings.g = { n: w.name, c: w.club, v: gL[0].v }; if (gL[0].k === 'ME') { C.tro.push({ y: s.year, n: 'Gol Kralı · ' + L.name, ic: '👟' }); news(`👟 GOL KRALI SENSİN! ${gL[0].v} gol`); } else news(`👟 ${L.name} gol kralı: ${w.name} (${FBT.team(w.club).name}) · ${gL[0].v} gol`); }
     if (aL[0]) { const w = who(aL[0].k); kings.a = { n: w.name, c: w.club, v: aL[0].v }; if (aL[0].k === 'ME') { C.tro.push({ y: s.year, n: 'Asist Kralı · ' + L.name, ic: '🎯' }); news(`🎯 ASİST KRALI SENSİN! ${aL[0].v} asist`); } }
     MEDIA.season(pos, kings);
-    C.hist.push({ y: s.year, club: C.club, apps: my.apps, g: my.g, a: my.a, avg: Math.round(avg * 100) / 100, pos, lg: s.lg, gr: gR && gR.r, ar: aR && aR.r, lgG: (s.ps.ME || [0, 0, 0])[1], lgA: (s.ps.ME || [0, 0, 0])[2], kings });
+    C.hist.push({ y: s.year, club: C.club, apps: my.apps, bench: my.dnp || 0, subs: my.subs || 0, mins: my.mins || 0, g: my.g, a: my.a, avg: Math.round(avg * 100) / 100, pos, lg: s.lg, gr: gR && gR.r, ar: aR && aR.r, lgG: (s.ps.ME || [0, 0, 0])[1], lgA: (s.ps.ME || [0, 0, 0])[2], kings });
     const p = me(); p.age++;
     if (p.age > 30) { ['hiz', 'fizik'].forEach(k => p.attr[k] = Math.max(30, p.attr[k] - (1 + ((Math.random() * 2) | 0)))); }
     // Transfer offers
@@ -670,7 +700,12 @@ function Futbol(host) {
     const a = b.dataset.a;
     if (a === 'play') { FBA.play('confirm'); sub.fix = f; show('pre'); }
     else if (a === 'resume') { FBA.play('confirm'); sub.fix = f; startMatch(f, C.live); }
-    else if (a === 'sim') { FBA.play('ui'); const res = C.live ? simFromLive(f) : simUser(f); applyResult(f, res); show('post'); }
+    else if (a === 'sim') {
+      FBA.play('ui'); const sel = C.live ? null : selection(f);
+      if (sel && sel.st === 'bench') { applyResult(f, benchSim(f)); toast('🪑 Kulübede kaldın · maç simüle edildi'); return show('hub'); }
+      if (sel && sel.st === 'sub') C.live = liveFromSel(f, sel);
+      const res = C.live ? simFromLive(f) : simUser(f); applyResult(f, res); show('post');
+    }
     else if (a === 'up') { const k = b.dataset.k, p = me(), c = FBC.cost(p.attr[k]); if (p.up >= c && p.attr[k] < 99) { p.up -= c; p.attr[k]++; FBA.play('confirm'); save(true); renderHub(); } else { FBA.play('back'); toast(p.attr[k] >= 99 ? 'Zirvedesin!' : `${c} gelişim hakkı gerekli`); } }
     else if (a === 'len') { C.set.len = +b.dataset.v; FBA.play('ui'); save(true); renderHub(); }
     else if (a === 'save') { if (save()) { FBA.play('confirm'); toast('✅ Kaydedildi'); } }
@@ -700,7 +735,7 @@ function Futbol(host) {
   }
   function rowMine(m) {
     const o = FBT.team(m.opp), w = m.sc[0] > m.sc[1] || (m.pen && m.pen.includes('kazandın')), d = m.sc[0] === m.sc[1] && !m.pen;
-    return `<div class="fb-li"><span class="fb-wdl ${w ? 'w' : d ? 'd' : 'l'}">${w ? 'G' : d ? 'B' : 'M'}</span>${FBT.badge(o, 20)}<span class="grow">${m.home ? '' : '@ '}${esc(o.name)}<small>${esc(m.comp)}${m.pen ? ' · ' + m.pen : ''}${m.sim ? ' · sim' : ''}</small></span><b class="fb-scb">${m.sc[0]}<i>-</i>${m.sc[1]}</b><span class="fb-r ${m.r >= 7.5 ? 'hi' : m.r < 6 ? 'fbr-lo' : ''}">${m.r.toFixed(1)}</span></div>`;
+    return `<div class="fb-li"><span class="fb-wdl ${w ? 'w' : d ? 'd' : 'l'}">${w ? 'G' : d ? 'B' : 'M'}</span>${FBT.badge(o, 20)}<span class="grow">${m.home ? '' : '@ '}${esc(o.name)}<small>${esc(m.comp)}${m.pen ? ' · ' + m.pen : ''}${m.sim ? ' · sim' : ''}</small></span><b class="fb-scb">${m.sc[0]}<i>-</i>${m.sc[1]}</b>${m.dnp ? '<span class="fb-r fbr-bench" title="Kulübede kaldı">🪑</span>' : `<span class="fb-r ${m.r >= 7.5 ? 'hi' : m.r < 6 ? 'fbr-lo' : ''}">${m.r.toFixed(1)}</span>`}</div>`;
   }
   function tabKadro(el) {
     const t = club(), p = me(), sq = FBT.squad(C.club), role = FBC.ROLE_OF[p.pos];
@@ -760,7 +795,7 @@ function Futbol(host) {
       FBC.ATTR.map(([k, l]) => { const c = FBC.cost(p.attr[k]); return `<div class="fb-att"><span>${l}</span><div class="fb-meter"><i style="width:${p.attr[k]}%"></i></div><b>${p.attr[k]}</b><button class="fb-btn sm ${p.up >= c && p.attr[k] < 99 ? 'pri' : ''}" data-a="up" data-k="${k}">+1 <small>${c} hak</small></button></div><p class="fb-attfx">${FBC.ATTR_FX[k]}</p>`; }).join('') +
       `<p class="fb-mut">Genel: <b>${FBC.ovr(p)}</b> · 75 üstü her artış 2 hak ister.${p.age > 30 ? ' 30 yaşından sonra hız ve fizik her sezon biraz düşer.' : ''}</p>
       <details class="fb-help"><summary>Skill Puanı nasıl kazanılır?</summary><div class="fb-tip">Maç sonundaki reytingine göre: Çok kötü (5.3 altı) −10/−15 · Kötü (6.0 altı) −5 · Ortalama +5 · İyi (6.9+) +10 · Çok iyi (7.8+) +15 · <b>Maçın oyuncusu (MVP) +25 bonus</b>.<br>Her eşik = <b>3 gelişim hakkı</b>; ilk eşik 100 puan, sonraki her eşik <b>+5</b> puan daha fazla ister (100, 105, 110…). Artan puan sonraki eşiğe aktarılır. Reytingi goller, asistler, isabetli pas ve şutlar yükseltir; top kaybı, hatalı pas ve kaçan fırsatlar düşürür.</div></details>
-      ${last.length ? `<h4>Son maçlarda kazanılan puan</h4><div class="fb-list">${last.map(m => `<div class="fb-li"><span class="grow">${esc(FBT.team(m.opp).name)}<small>${esc(m.comp)}</small></span>${m.mvp ? '<span title="MVP">🏅</span>' : ''}<span class="fb-r">${m.r.toFixed(1)}</span><b class="${m.d >= 0 ? 'fb-up' : 'fb-dn'}">${m.d >= 0 ? '+' : ''}${m.d ?? ''}</b></div>`).join('')}</div>` : ''}`;
+      ${last.length ? `<h4>Son maçlarda kazanılan puan</h4><div class="fb-list">${last.map(m => `<div class="fb-li"><span class="grow">${esc(FBT.team(m.opp).name)}<small>${esc(m.comp)}${m.sub ? ` · ${m.sub}' oyuna girdi` : ''}</small></span>${m.mvp ? '<span title="MVP">🏅</span>' : ''}<span class="fb-r">${m.dnp ? '🪑' : m.r.toFixed(1)}</span><b class="${m.d >= 0 ? 'fb-up' : 'fb-dn'}">${m.d >= 0 ? '+' : ''}${m.d ?? ''}</b></div>`).join('')}</div>` : ''}`;
   }
   const NCAT = { mac: ['Maç', '#22c55e', 'ball'], oyuncu: ['Futbolcu', '#eab308', 'shirt'], takim: ['Takım', '#3b82f6', 'shield'], avrupa: ['Avrupa', '#a855f7', 'cup'], dunya: ['Dünya', '#06b6d4', 'globe'], magazin: ['Magazin', '#f472b6', 'mic'] };
   function newsCard(n, small, lead) {
@@ -803,10 +838,10 @@ function Futbol(host) {
   function bindIst(el) { el.querySelectorAll('[data-ist]').forEach(b => b.onclick = () => { sub.istView = b.dataset.ist; FBA.play('ui'); renderHub(); }); }
   function tabKar(el) {
     const t = C.tot, H = C.hist.slice().reverse();
-    const s = C.s, cur = !C.phase && s.my.apps ? (() => { const tt = club(), pos = FBC.order(s.tab).indexOf(myIdx()) + 1; return `<div class="fb-li now">${FBT.badge(tt, 20)}<span class="grow">${s.year}-${String(s.year + 1).slice(2)} · ${esc(tt.name)}<small>Devam ediyor · ${s.res.filter(Boolean).length}. hafta · lig ${pos}.</small></span><b>${s.my.g}G ${s.my.a}A</b><span class="fb-r">${(s.my.rs / s.my.apps).toFixed(2)}</span></div>`; })() : '';
+    const s = C.s, cur = !C.phase && s.my.apps ? (() => { const tt = club(), pos = FBC.order(s.tab).indexOf(myIdx()) + 1; return `<div class="fb-li now">${FBT.badge(tt, 20)}<span class="grow">${s.year}-${String(s.year + 1).slice(2)} · ${esc(tt.name)}<small>Devam ediyor · ${s.res.filter(Boolean).length}. hafta · lig ${pos}. · ${s.my.apps} maç${s.my.subs ? ` (${s.my.subs} yedekten)` : ''}${s.my.dnp ? ` · 🪑 ${s.my.dnp} kulübe` : ''}${s.my.mins ? ` · ${s.my.mins} dk` : ''}</small></span><b>${s.my.g}G ${s.my.a}A</b><span class="fb-r">${(s.my.rs / s.my.apps).toFixed(2)}</span></div>`; })() : '';
     el.innerHTML = `<div class="fb-stats k3"><div><b>${t.apps}</b><small>Maç</small></div><div><b>${t.g}</b><small>Gol</small></div><div><b>${t.a}</b><small>Asist</small></div><div><b>${t.apps ? (t.rs / t.apps).toFixed(2) : '-'}</b><small>Ort.</small></div><div><b>${C.tro.length}</b><small>Kupa</small></div><div><b>${C.tot.far ? C.tot.far + ' m' : '-'}</b><small>En uzak gol</small></div></div>
       <h4>Kupalar</h4><div class="fb-tro">${C.tro.map(x => `<div><span>${x.ic}</span><b>${esc(x.n)}</b><small>${x.y}-${String(x.y + 1).slice(2)}</small></div>`).join('') || '<p class="fb-mut">Henüz kupa yok — ilkini kazan!</p>'}</div>
-      <h4>Sezonlar</h4><div class="fb-list">${cur}${H.map(h => { const tt = FBT.team(h.club); return `<div class="fb-li">${FBT.badge(tt, 20)}<span class="grow">${h.y}-${String(h.y + 1).slice(2)} · ${esc(tt.name)}<small>Lig ${h.pos}. · ${h.apps} maç${h.gr ? ` · gol krallığı ${h.gr}.` : ''}${h.ar ? ` · asist ${h.ar}.` : ''}</small></span><b>${h.g}G ${h.a}A</b><span class="fb-r">${h.avg.toFixed(2)}</span></div>`; }).join('') || (cur ? '' : '<p class="fb-mut">İlk sezonun devam ediyor.</p>')}</div>`;
+      <h4>Sezonlar</h4><div class="fb-list">${cur}${H.map(h => { const tt = FBT.team(h.club); return `<div class="fb-li">${FBT.badge(tt, 20)}<span class="grow">${h.y}-${String(h.y + 1).slice(2)} · ${esc(tt.name)}<small>Lig ${h.pos}. · ${h.apps} maç${h.subs ? ` (${h.subs} yedekten)` : ''}${h.bench ? ` · 🪑 ${h.bench} maç kulübede` : ''}${h.gr ? ` · gol krallığı ${h.gr}.` : ''}${h.ar ? ` · asist ${h.ar}.` : ''}</small></span><b>${h.g}G ${h.a}A</b><span class="fb-r">${h.avg.toFixed(2)}</span></div>`; }).join('') || (cur ? '' : '<p class="fb-mut">İlk sezonun devam ediyor.</p>')}</div>`;
   }
   function tabAyr(el) {
     el.innerHTML = `<h4>Ses</h4><div class="fb-vol">${[['master', 'Genel ses'], ['sfx', 'Efektler (vuruş, düdük)'], ['crowd', 'Tribün ve tezahürat']].map(([k, l]) => `<label>${l}<input type="range" data-v="${k}" min="0" max="100" value="${Math.round(FBA.vol[k] * 100)}"></label>`).join('')}${navigator.vibrate ? `<label class="fb-hap">Titreşim<input type="checkbox" data-v="hap" ${FBA.vol.hap ? 'checked' : ''}></label>` : ''}</div>
@@ -847,17 +882,58 @@ function Futbol(host) {
     };
   }
 
+  /* ---------- Squad selection: starter, substitute or bench ---------- */
+  // Decided once per match (kept in the save). Starting depends on your overall vs the regular in your position,
+  // recent form, club size (big clubs are harder) and a bench streak (the coach gives you a chance eventually).
+  function selection(f) {
+    const s = C.s; if (C.sel && C.sel.wk === s.wk && C.sel.y === s.year) return C.sel;
+    if ((C.live && C.live.wk === s.wk && C.live.min > 0) || window.__fbStart) return (C.sel = { wk: s.wk, y: s.year, st: 'start', min: 0 });   // a match already in progress (or a test hook)
+    const p = me(), t = club(), role = FBC.ROLE_OF[p.pos], rival = FBT.squad(C.club).find(x => x.role === role), rOvr = Math.round(rival.sk * 100) - 5;
+    const recent = s.mine.filter(m => !m.dnp).slice(-5), form = recent.length ? recent.reduce((a, m) => a + m.r, 0) / recent.length : 6.6, streak = C.benchRun || 0;
+    const score = FBC.ovr(p) - rOvr + (form - 6.6) * 6 + (75 - t.r) * .25 + streak * 4 - (f.e.k === 'E' ? 2 : 0);
+    const pStart = clamp(1 / (1 + Math.exp(-(score / 5 + .6))), .06, .97), R = Math.random;
+    let st = 'start', min = 0, why = '';
+    if (R() >= pStart) {
+      if (R() < .08) { st = 'sub'; min = 16 + Math.floor(R() * 14); why = 'inj'; }   // an early injury opens a spot (rare)
+      else if (R() < clamp(.65 + score * .03 + streak * .08, .25, .92)) { st = 'sub'; min = 52 + Math.floor(R() * 26); }
+      else st = 'bench';
+    }
+    C.sel = { wk: s.wk, y: s.year, st, min, why, p: Math.round(pStart * 100), rival: rival.name, rOvr }; save(true);
+    return C.sel;
+  }
+  // Minutes played without the user: goals from the scoring model, scorers from the squads
+  function preSim(f, upTo) {
+    const t = club(), o = FBT.team(f.opp), [lM, lO] = FBX.lam(t.r, o.r, f.neutral ? 0 : f.home ? 1 : -1), role = FBC.ROLE_OF[me().pos];
+    const sq = FBT.squad(C.club).filter(x => ['ST', 'LW', 'RW', 'CM', 'LCM', 'RCM'].includes(x.role) && x.role !== role), osq = FBT.squad(f.opp).filter(x => x.role !== 'GK');
+    const sc = [0, 0], log = [], mt = () => 1 + Math.floor(Math.random() * Math.max(1, upTo - 1));
+    for (let i = FBU.poisson(lM * upTo / 90); i > 0; i--) { sc[0]++; const s2 = FBU.pick(sq); log.push({ m: mt(), side: 0, name: s2.short, r: s2.role }); }
+    for (let i = FBU.poisson(lO * upTo / 90); i > 0; i--) { sc[1]++; const s2 = FBU.pick(osq); log.push({ m: mt(), side: 1, name: s2.short, r: s2.role }); }
+    log.sort((a, b) => a.m - b.m);
+    return { min: upTo, sc, us: {}, log };
+  }
+  function benchSim(f) { const r = preSim(f, 90); return { sc: r.sc, us: { r: 0 }, log: r.log, sim: true, dnp: true }; }
+  // Play / simulate the next match according to the selection
+  function liveFromSel(f, sel) { const b = preSim(f, sel.min); return { min: sel.min, sc: b.sc, us: {}, rating: 6, log: b.log, wk: C.s.wk }; }
+
   /* ---------- Pre-match, match, post-match ---------- */
   function renderPre() {
-    const f = sub.fix, p = me(), role = FBC.ROLE_OF[p.pos];
+    const f = sub.fix, p = me(), role = FBC.ROLE_OF[p.pos], sel = selection(f);
+    const selBox = sel.st === 'start' ? `<div class="fb-sel-st on">✅ <b>İlk 11'desin.</b> <small>Formayı ${esc(sel.rival || '')} ile yarışarak aldın.</small></div>`
+      : sel.st === 'sub' ? `<div class="fb-sel-st sub">🪑 <b>Yedek kulübesindesin.</b> ${sel.why === 'inj' ? `Bir arkadaşın sakatlanırsa erken girebilirsin: yaklaşık <b>${sel.min}'</b>.` : `Teknik direktör seni yaklaşık <b>${sel.min}'</b> civarında oyuna sokmayı düşünüyor.`}<small>Mevkindeki rakibin: ${esc(sel.rival)} (${sel.rOvr}) · sen ${FBC.ovr(p)}. İyi oyna, forma senin olsun.</small></div>`
+      : `<div class="fb-sel-st bench">🪑 <b>Bu maçta kulübedesin, oyuna girmen beklenmiyor.</b><small>Mevkindeki rakibin: ${esc(sel.rival)} (${sel.rOvr}) · sen ${FBC.ovr(p)}. Maç hızlıca simüle edilecek.</small></div>`;
     // One ordered pair (home first) drives the header and both line-ups, so a side never shows the other club's XI
     const sides = (f.home ? [C.club, f.opp] : [f.opp, C.club]).map(id => ({ id, t: FBT.team(id), mine: id === C.club }));
-    const xi = sd => FBT.squad(sd.id).map(x => { const m = sd.mine && x.role === role, num = m ? p.num : (sd.mine && x.num === p.num ? 13 : x.num); return `<div class="${m ? 'me' : ''}"><i>${num}</i>${esc(m ? p.short : x.short)}</div>`; }).join('');
+    const xi = sd => FBT.squad(sd.id).map(x => { const m = sd.mine && x.role === role && sel.st === 'start', num = m ? p.num : (sd.mine && x.num === p.num ? 13 : x.num); return `<div class="${m ? 'me' : ''}"><i>${num}</i>${esc(m ? p.short : x.short)}</div>`; }).join('');
     main.innerHTML = `<div class="fb-pre"><div class="fb-nc">${esc(f.comp)}</div><div class="fb-vs">${sides.map((sd, i) => `${i ? '<b>VS</b>' : ''}<div>${FBT.badge(sd.t, 54)}<span>${esc(sd.t.name)}</span><small class="fb-ha">${i ? 'Deplasman' : 'Ev sahibi'}${sd.mine ? ' · senin takımın' : ''}</small></div>`).join('')}</div>
-      <div class="fb-xis">${sides.map(sd => `<div class="fb-xi ${sd.mine ? 'mine' : ''}" style="--c:${sd.t.c1}"><h5>${FBT.badge(sd.t, 16)} ${esc(sd.t.abbr)}</h5>${xi(sd)}</div>`).join('')}</div>
+      <div class="fb-xis">${sides.map(sd => `<div class="fb-xi ${sd.mine ? 'mine' : ''}" style="--c:${sd.t.c1}"><h5>${FBT.badge(sd.t, 16)} ${esc(sd.t.abbr)}</h5>${xi(sd)}${sd.mine && sel.st !== 'start' ? `<div class="me fb-xib"><i>${p.num}</i>${esc(p.short)} 🪑</div>` : ''}</div>`).join('')}</div>${selBox}
       <div class="fb-tip"><b>Nasıl oynanır?</b><br>Maç hızlı akar, diğer pozisyonlar yorumla özetlenir. Top sana gelmeden hemen önce saha açılır ve sıra sende. Topu göndermek istediğin yönün <b>tersine çek</b>, bırak; sonra topun neresine vuracağını seç. <b>Dokun</b> = kısa top sürme. <b>Savunmada</b> basılı tutup rakibin önüne geç, halka yeşilken topa doğru <b>hızlıca kaydır</b>. Ayarlar'dan eğitimi tekrar oynayabilirsin.</div>
-      <button class="fb-btn pri big" data-a="go">⚽ Başlama düdüğü</button></div>`;
-    main.onclick = e => { const b = e.target.closest('button'); if (b && b.dataset.a === 'go') { FBA.play('confirm'); C.live = { min: 0, sc: [0, 0], us: {}, rating: 6, log: [], wk: C.s.wk }; save(true); startMatch(f, null); } };
+      <button class="fb-btn pri big" data-a="go">${sel.st === 'start' ? '⚽ Başlama düdüğü' : sel.st === 'sub' ? `🔁 ${sel.min}'. dakikadan oyuna gir` : '⏩ Maçı hızlıca simüle et'}</button></div>`;
+    main.onclick = e => {
+      const b = e.target.closest('button'); if (!b || b.dataset.a !== 'go') return; FBA.play('confirm');
+      if (sel.st === 'bench') { applyResult(f, benchSim(f)); toast('🪑 Kulübede kaldın · maç simüle edildi'); return show('hub'); }
+      C.live = sel.st === 'sub' ? liveFromSel(f, sel) : { min: 0, sc: [0, 0], us: {}, rating: 6, log: [], wk: C.s.wk }; save(true);
+      startMatch(f, C.live.min > 0 ? C.live : null);
+    };
   }
   function startMatch(f, resume) {
     view = 'match'; top.hidden = true; main.innerHTML = ''; main.onclick = null;
@@ -866,6 +942,7 @@ function Futbol(host) {
     if (!C.live) C.live = { min: 0, sc: [0, 0], us: {}, rating: 6, log: [], wk: C.s.wk };
     let lastSave = 0;
     match = FBMatch(wrap, {
+      subIn: resume && C.sel && C.sel.st === 'sub' && resume.min === C.sel.min ? C.sel.min : 0,
       my: club(), opp: FBT.team(f.opp), home: f.home, comp: f.comp, len: C.set.len, zoom: C.set.zoom || 1, onZoom(z) { C.set.zoom = Math.round(z * 100) / 100; }, resume: resume && resume.min > 0 ? resume : null,
       user: { name: p.first + ' ' + p.last, short: p.short, num: p.num, pos: p.pos, attr: p.attr, look: p.look },
       onLive(s) { Object.assign(C.live, s); const n = Date.now(); if (n - lastSave > 1500) { lastSave = n; save(true); } },
@@ -913,9 +990,10 @@ function Futbol(host) {
     if (big) B1.unshift('big'); else if (!derby && !euro && !upset) B1.push(win ? 'win' : draw ? 'draw' : 'loss');
     if (!A1.length) A1.push('open');
     const used = new Set(), line = k => { let t, i = 0; do t = pickR(CM_POOL[k]); while (used.has(t) && i++ < 5); used.add(t); return esc(fill(t)); };
-    const rows = [['Rıza Mikrofon', A1[0]], ['Hoca Taktikçi', B1[0]]];
-    if (A1[1]) rows.push(['Rıza Mikrofon', A1[1]]); else if (B1[1]) rows.push(['Hoca Taktikçi', B1[1]]);
-    return `<div class="fb-cm"><div class="fb-cmh">🎙️ Maç sonu yorumu${derby ? ` · ${esc(derby)}` : euro ? ' · Avrupa gecesi' : ''}</div>${rows.map(([w, k]) => `<div><b>${w}:</b> ${line(k)}</div>`).join('')}</div>`;
+    const rows = [[PN()[0], A1[0]], [PN()[1], B1[0]]];
+    if (A1[1]) rows.push([PN()[0], A1[1]]); else if (B1[1]) rows.push([PN()[1], B1[1]]);
+    if (!big && !derby) rows.push([PN()[2], win ? 'win' : draw ? 'draw' : 'loss']);   // the studio host wraps up
+    return `<div class="fb-cm"><div class="fb-cmh">🎙️ Maç sonu yorumu${derby ? ` · ${esc(derby)}` : euro ? ' · Avrupa gecesi' : ''}</div>${rows.map(([w, k]) => `<div><b>${esc(w)}:</b> ${line(k)}</div>`).join('')}</div>`;
   }
   function renderPost() {
     const L = sub.last; if (!L) return show('hub');
