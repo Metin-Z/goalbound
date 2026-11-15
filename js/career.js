@@ -845,11 +845,13 @@ function Futbol(host) {
 
   /* ---------- Pre-match, match, post-match ---------- */
   function renderPre() {
-    const f = sub.fix, t = club(), o = FBT.team(f.opp), p = me(), role = FBC.ROLE_OF[p.pos];
-    const xi = (id, mine) => FBT.squad(id).map(x => { const m = mine && x.role === role; return `<div class="${m ? 'me' : ''}"><i>${m ? p.num : x.num}</i>${esc(m ? p.short : x.short)}</div>`; }).join('');
-    main.innerHTML = `<div class="fb-pre"><div class="fb-nc">${esc(f.comp)}</div><div class="fb-vs"><div>${FBT.badge(f.home ? t : o, 54)}<span>${esc((f.home ? t : o).name)}</span></div><b>VS</b><div>${FBT.badge(f.home ? o : t, 54)}<span>${esc((f.home ? o : t).name)}</span></div></div>
-      <div class="fb-xis"><div class="fb-xi" style="--c:${t.c1}"><h5>${esc(t.abbr)}</h5>${xi(C.club, true)}</div><div class="fb-xi" style="--c:${o.c1}"><h5>${esc(o.abbr)}</h5>${xi(f.opp)}</div></div>
-      <div class="fb-tip"><b>Nasıl oynanır?</b><br>Maç hızlı akar, diğer pozisyonlar yorumla özetlenir. Top sana gelmeden hemen önce saha açılır ve sıra sende. Ekranda <b>sürükle</b>: yön ve güç seçilir, bırakınca vurursun. <b>Kısa sürükleme</b> topu sürer (çalım). <b>Aşırt</b> topu havalandırır, <b>Falso</b> kavis verir. Arkadaşlarına pas vererek asist yap!</div>
+    const f = sub.fix, p = me(), role = FBC.ROLE_OF[p.pos];
+    // One ordered pair (home first) drives the header and both line-ups, so a side never shows the other club's XI
+    const sides = (f.home ? [C.club, f.opp] : [f.opp, C.club]).map(id => ({ id, t: FBT.team(id), mine: id === C.club }));
+    const xi = sd => FBT.squad(sd.id).map(x => { const m = sd.mine && x.role === role, num = m ? p.num : (sd.mine && x.num === p.num ? 13 : x.num); return `<div class="${m ? 'me' : ''}"><i>${num}</i>${esc(m ? p.short : x.short)}</div>`; }).join('');
+    main.innerHTML = `<div class="fb-pre"><div class="fb-nc">${esc(f.comp)}</div><div class="fb-vs">${sides.map((sd, i) => `${i ? '<b>VS</b>' : ''}<div>${FBT.badge(sd.t, 54)}<span>${esc(sd.t.name)}</span><small class="fb-ha">${i ? 'Deplasman' : 'Ev sahibi'}${sd.mine ? ' · senin takımın' : ''}</small></div>`).join('')}</div>
+      <div class="fb-xis">${sides.map(sd => `<div class="fb-xi ${sd.mine ? 'mine' : ''}" style="--c:${sd.t.c1}"><h5>${FBT.badge(sd.t, 16)} ${esc(sd.t.abbr)}</h5>${xi(sd)}</div>`).join('')}</div>
+      <div class="fb-tip"><b>Nasıl oynanır?</b><br>Maç hızlı akar, diğer pozisyonlar yorumla özetlenir. Top sana gelmeden hemen önce saha açılır ve sıra sende. Topu göndermek istediğin yönün <b>tersine çek</b>, bırak; sonra topun neresine vuracağını seç. <b>Dokun</b> = kısa top sürme. <b>Savunmada</b> basılı tutup rakibin önüne geç, halka yeşilken topa doğru <b>hızlıca kaydır</b>. Ayarlar'dan eğitimi tekrar oynayabilirsin.</div>
       <button class="fb-btn pri big" data-a="go">⚽ Başlama düdüğü</button></div>`;
     main.onclick = e => { const b = e.target.closest('button'); if (b && b.dataset.a === 'go') { FBA.play('confirm'); C.live = { min: 0, sc: [0, 0], us: {}, rating: 6, log: [], wk: C.s.wk }; save(true); startMatch(f, null); } };
   }
@@ -918,7 +920,7 @@ function Futbol(host) {
     const rows = [['Gol', n('g')], ['Asist', n('a')], ['İsabetli pas', n('pk')], ['Şut / isabetli', `${n('sh')} / ${n('sot')}`], ['Çalım', n('dr')], ['Top kaybı', n('lost'), 1], ['Hatalı pas', n('pf'), 1], ['Kaçan büyük fırsat', n('miss'), 1]];
     let h = `<div class="fb-post ${win ? 'w' : draw ? 'd' : 'l'}"><div class="fb-nc">${esc(f.comp)}</div><div class="fb-vs"><div>${FBT.badge(H, 50)}<span>${esc(H.name)}</span></div><b class="fb-led"><span>${sh}<i>-</i>${sa}</span></b><div>${FBT.badge(A, 50)}<span>${esc(A.name)}</span></div></div>
       ${pen ? `<div class="fb-live">${pen}</div>` : ''}<h3>${win ? 'Galibiyet!' : draw ? 'Beraberlik' : 'Mağlubiyet'}</h3>
-      ${res.log && res.log.length ? `<div class="fb-ev">${res.log.map(e => `<span>⚽ ${e.m}' ${esc(e.name)}${e.a ? ` <small>(${esc(e.a)})</small>` : ''}${e.side === 0 ? '' : ' 🔻'}</span>`).join('')}</div>` : ''}
+      ${res.log && res.log.length ? `<div class="fb-ev">${res.log.map(e => `<span>⚽ ${e.m}' ${esc(e.name)}${e.a ? ` <small>(${esc(e.a)})</small>` : ''} <small class="fb-gt">${esc((e.side === 0 ? t : o).abbr)}</small></span>`).join('')}</div>` : ''}
       ${(us.gd || []).length ? `<div class="fb-dist">🎯 Gollerin: ${us.gd.map(d => `<b>${d} m</b>`).join(' · ')}${us.gd.length > 1 ? ` · en uzak <b>${Math.max(...us.gd)} m</b>` : ''}</div>` : ''}
       <div class="fb-perf ${band.c}"><div><small>Maç reytingi</small><b>${us.r.toFixed(1)}</b></div><div><small>Performans</small><b>${band.l}</b></div></div>
       <div class="fb-mvp ${mvp ? 'on' : ''}">${mvp ? '🏅 <b>MAÇIN OYUNCUSU SENSİN!</b>' : `Maçın oyuncusu: <b>${esc(best.name)}</b> (${best.r.toFixed(1)})`}</div>

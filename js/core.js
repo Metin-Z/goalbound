@@ -73,7 +73,7 @@ const FBT = {
   _build(seed) {
     const used = new Set(), map = {};
     FBT.all().forEach(id => {
-      const t = FBT.team(id), r = FBU.rng('sq' + seed + id), L = t.lg, real = FB_ROSTERS[id], shorts = new Set();
+      const t = FBT.team(id), r = FBU.rng('sq' + seed + id), L = t.lg, real = FB_ROSTERS[id], shorts = new Set(), nums = new Set();
       const dom = FBU.clamp(L.dom - (t.r - 72) * .012, .2, .9), foreign = FB_FOREIGN.filter(n => n !== L.nat && FB_NAMES[n]);
       map[id] = FBT.ROLES.map((role, k) => {
         let name, nat = L.nat;
@@ -89,6 +89,8 @@ const FBT = {
         }
         shorts.add(name.split(' ').slice(-1)[0]);
         let num = FBT.NUMS[role]; if (r() < .35 && role !== 'GK') num = [14, 17, 19, 20, 21, 22, 23, 27, 33, 77, 88, 99][(r() * 12) | 0];
+        while (nums.has(num)) num = num >= 99 ? 12 : num + 1;   // shirt numbers are unique within a club
+        nums.add(num);
         return { role, name, nat, short: name.split(' ').slice(-1)[0], num, sk: FBU.clamp(t.r / 100 + (r() - .5) * .12, .45, .97) };
       });
     });

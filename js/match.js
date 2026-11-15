@@ -1043,7 +1043,7 @@ function FBMatch(host, o) {
     showCard(`<div class="fbm-h">Devre arası</div>${scoreLine()}<p>⭐ Reytingin ${st.rating.toFixed(1)} · ${st.us.g} gol · ${st.us.a} asist</p><button class="fbm-btn pri" data-a="h2">2. Yarı ▶</button>`);
     FBA.crowdLevel(.15);
   }
-  function scoreLine() { const h = o.home ? st.sc[0] : st.sc[1], a = o.home ? st.sc[1] : st.sc[0]; return `<div class="fbm-fs">${FBT.badge(homeT, 30)}<b>${h} - ${a}</b>${FBT.badge(awayT, 30)}</div><div class="fbm-ev">${st.log.map(e => `<span>⚽ ${e.m}' ${FBU.esc(e.name)}${e.user ? ' ⭐' : ''}${e.d ? ` · ${e.d} m` : ''}${e.side ? ' 🔻' : ''}</span>`).join('')}</div>`; }
+  function scoreLine() { const h = o.home ? st.sc[0] : st.sc[1], a = o.home ? st.sc[1] : st.sc[0]; return `<div class="fbm-fs">${FBT.badge(homeT, 30)}<b>${h} - ${a}</b>${FBT.badge(awayT, 30)}</div><div class="fbm-ev">${st.log.map(e => `<span>⚽ ${e.m}' ${FBU.esc(e.name)}${e.user ? ' ⭐' : ''}${e.d ? ` · ${e.d} m` : ''} <small>${FBU.esc((e.side ? o.opp : o.my).abbr)}</small></span>`).join('')}</div>`; }
   function fulltime() {
     st.ended = true; showTicker(true); FBA.play('whistle', 'end'); FBA.crowdLevel(.2); refreshRating();
     feed(`🏁 90' Maç sona erdi`, 'mut');
