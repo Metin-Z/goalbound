@@ -1,0 +1,21 @@
+{
+  "icon": {
+    "note": "Uygulama ikonu adayları (sade, turuncu-siyah, yazısız)",
+    "n": 12,
+    "neg": "photograph, realistic 3d render, gradient background, grey background, texture, noise, text, letters, words, watermark, signature, blurry, laurel wreath, tiny details, frame, border, cropped",
+    "prompts": [
+      "A minimal flat vector mobile game app icon on a solid pure black background. In the center, a bold orange shield shape containing a clean white classic soccer ball with crisp black pentagons. Thick, simple geometric shapes, perfectly symmetrical, generous empty space around the emblem, no text.",
+      "A flat vector app icon for a football career game. A white soccer ball with clean black pentagon pattern, with a bold bright orange upward arrow sweeping around it, on a solid pure black background. Minimal, high contrast, centered with generous padding, no text.",
+      "A minimal geometric emblem for a sports game: a simple bright orange circle badge with a white soccer ball silhouette and a small white star above it, on a solid pure black background. Flat colors only, thick shapes, centered, readable at small size, no text.",
+      "A modern flat esports-style logo mark: an abstract soccer ball made of bold orange and white geometric segments, slightly dynamic tilt, on a solid pure black background. Clean vector edges, no outlines clutter, centered with padding, no text."
+    ]
+  },
+  "crest": {
+    "note": "Hayali kulüp arması denemeleri (sonraki adımlar için)",
+    "n": 8,
+    "neg": "photograph, realistic 3d render, text, letters, words, watermark, signature, blurry, tiny details",
+    "prompts": [
+      "A flat vector football club crest for a fictional team: a classic shield shape in two bold colors with a stylized animal head in the center, on a solid dark background. Clean vector shapes, centered, no text."
+    ]
+  }
+}

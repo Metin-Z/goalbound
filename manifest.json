@@ -1,0 +1,22 @@
+{
+  "id": "./",
+  "name": "GOALBOUND",
+  "short_name": "GOALBOUND",
+  "description": "Tek oyunculu futbol kariyer oyunu: oyuncunu yarat, Süper Lig'den başla, Avrupa'yı fethet.",
+  "lang": "tr",
+  "dir": "ltr",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "portrait",
+  "background_color": "#070606",
+  "theme_color": "#070606",
+  "categories": ["games", "sports"],
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

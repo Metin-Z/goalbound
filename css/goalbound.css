@@ -1,0 +1,286 @@
+/* Design direction: TV broadcast / stadium scoreboard — condensed caps, scorebug bars, LED numerals; orange accent on near-black */
+/* ---------- Futbol Kariyeri ---------- */
+.fb{position:absolute;inset:0;display:flex;flex-direction:column;background:radial-gradient(120% 60% at 50% 0,var(--bg1) 0,var(--bg2) 60%,var(--bg3) 100%);color:var(--tx);font-size:14px;transition:background-color .4s}
+/* GOALBOUND default theme: orange accent on near-black surfaces (club colours override these once a career is loaded) */
+.fb{--acc:#ff7a1a;--accd:#c2410c;--accs:#5c1f02;--onacc:#160a02;--onaccd:#fff;--acc2:#ffb27a;--bg1:#1c1510;--bg2:#0e0c0b;--bg3:#070606;--panel:#151211;--panel2:#26201c;--line:rgba(255,255,255,.1);--tx:#f5f2ef;--mut:#c4bab3;--mut2:#988e87;--sub:#ebe4de}
+.fb input.fb-in{-webkit-user-select:text;user-select:text}
+.fb-top{display:flex;align-items:center;gap:6px;padding:8px 10px;padding-top:max(8px,env(safe-area-inset-top));background:rgba(0,0,0,.35);border-bottom:1px solid rgba(255,255,255,.08)}
+.fb-top button{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.08);font-size:18px}
+.fb-top button[data-t=back]{font-size:26px;line-height:1}
+.fb-title{flex:1;font-weight:800;letter-spacing:.3px}
+.fb-main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 12px 30px;max-width:560px;width:100%;margin:0 auto}
+.fb-toast{position:absolute;left:50%;top:64px;transform:translate(-50%,-20px);background:#111c;border:1px solid #fff3;padding:9px 16px;border-radius:12px;opacity:0;transition:.25s;pointer-events:none;z-index:9;font-weight:600;max-width:90%;text-align:center}
+.fb-toast.on{opacity:1;transform:translate(-50%,0)}
+.fb-btn{padding:10px 16px;border-radius:12px;background:rgba(255,255,255,.1);font-weight:700;transition:transform .08s}
+.fb-btn:active{transform:scale(.95)}
+.fb-btn.pri{background:linear-gradient(180deg,var(--acc),var(--accd));color:var(--onacc);box-shadow:0 3px 0 var(--accs)}
+.fb-btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.25)}
+.fb-btn.sm{padding:6px 11px;font-size:13px}
+.fb-btn.big{padding:14px 20px;font-size:16px;width:100%;margin-top:10px}
+.fb-btn.warn{background:#b91c1c;border-color:#b91c1c}
+.fb-badge{display:inline-grid;place-items:center;flex:none;vertical-align:middle;font-weight:800;background:linear-gradient(135deg,var(--b1) 0 55%,var(--b2) 55% 100%);clip-path:polygon(0 0,100% 0,100% 64%,50% 100%,0 64%);filter:drop-shadow(0 1px 2px #0009)}
+.fb-badge i{font-style:normal;font-family:var(--fd);letter-spacing:.02em;line-height:1.3;padding:0 .3em;border-radius:.3em;background:rgba(6,6,6,.66);color:#fff;transform:translateY(-10%);white-space:nowrap;max-width:94%;overflow:hidden}
+.fb-hero{text-align:center;padding:22px 0 14px}
+.fb-hero h2{font-size:28px;margin:6px 0}.fb-hero p{color:var(--mut)}
+.fb-ball{font-size:56px;animation:fbspin 3s linear infinite;display:inline-block}
+@keyframes fbspin{to{transform:rotate(360deg)}}
+.fb-slots{display:flex;flex-direction:column;gap:10px}
+.fb-slot{display:flex;align-items:center;gap:10px;padding:12px;border-radius:16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)}
+.fb-slot.empty{border-style:dashed}.fb-slot.bad{border-color:#b91c1c}
+.fb-si{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}.fb-si span,.fb-si small{color:var(--mut);font-size:12px}
+.fb-sb{display:flex;flex-direction:column;gap:6px}
+.fb-note{color:var(--mut2);font-size:12px;margin-top:14px;line-height:1.45}
+.fb-mut{color:var(--mut);margin:6px 0}
+.fb-steps{display:flex;gap:4px;margin-bottom:12px}.fb-steps span{flex:1;text-align:center;font-size:11px;padding:6px 2px;border-radius:8px;background:rgba(255,255,255,.06);color:var(--mut2)}
+.fb-steps span.on{background:var(--acc);color:var(--onacc);font-weight:700}.fb-steps span.ok{color:var(--acc2)}
+.fb-cr{display:flex;gap:12px;align-items:flex-start}
+.fb-av{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;position:sticky;top:0;padding:8px;border-radius:16px;background:radial-gradient(circle at 50% 40%,var(--panel2),var(--panel))}
+.fb-avn{font-size:11px;font-weight:800;color:#fde047}
+.fb-crf{flex:1;display:flex;flex-direction:column;gap:10px;min-width:0}
+.fb-crf label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mut);font-weight:600}
+.fb-in{padding:11px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.35);color:#fff;font-size:16px;outline:none}
+.fb-in:focus{border-color:var(--acc)}
+.fb-num{display:flex;align-items:center;gap:12px}.fb-num b{font-size:22px;min-width:34px;text-align:center;color:#fff}
+.fb-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}
+.fb-chip{min-height:44px;display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.08);font-size:13px;color:#dfe;border:1px solid transparent}
+.fb-chip.on{background:color-mix(in srgb,var(--acc) 28%,transparent);border-color:var(--acc);color:var(--tx)}
+.fb-chip i{display:inline-block;width:18px;height:18px;border-radius:50%;vertical-align:middle;box-shadow:inset 0 0 0 1px #fff5}
+.fb-att{display:flex;align-items:center;gap:8px;margin:6px 0}.fb-att>span{width:54px;font-weight:700}.fb-att>b{width:24px;text-align:right}
+.fb-meter{flex:1;height:10px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden}.fb-meter i{display:block;height:100%;background:linear-gradient(90deg,var(--accd),var(--acc));transition:width .2s}
+.fb-pts{color:#fde047;font-size:16px}
+.fb-teams{display:grid;grid-template-columns:1fr;gap:6px}
+.fb-team{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.06);text-align:left;border:1px solid transparent}
+.fb-team span{flex:1;font-weight:700}.fb-team small{color:#fde047;font-size:11px}
+.fb-team.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 18%,transparent)}
+.fb-nav{display:flex;justify-content:space-between;gap:10px;margin-top:16px;position:sticky;bottom:-30px;padding:10px 0;background:linear-gradient(transparent,#070b09 40%)}
+.fb-nav .fb-btn{flex:1}
+.fb-pc{display:flex;align-items:center;gap:10px;padding:10px;border-radius:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 22%,transparent),rgba(0,0,0,.2));border:1px solid var(--line)}
+.fb-pav{flex:none;width:46px;height:60px;overflow:hidden}
+.fb-pi{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}.fb-pi span{font-size:12px;color:var(--mut);display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fb-ovr{text-align:center;background:#fde047;color:#111;border-radius:10px;padding:4px 10px;line-height:1}.fb-ovr b{font-size:24px;display:block}.fb-ovr small{font-size:10px;font-weight:800}
+.fb-tab h4{margin:16px 0 8px;font-size:14px;color:var(--sub);font-family:var(--fd);text-transform:uppercase;letter-spacing:.06em}
+.fb-next{padding:14px;border-radius:18px;background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid rgba(255,255,255,.12)}
+.fb-next.cup.ucl{background:linear-gradient(160deg,#1e3a8a,#0b1230)}.fb-next.cup.uel{background:linear-gradient(160deg,#9a3412,#2a1206)}.fb-next.cup.uecl{background:linear-gradient(160deg,#166534,#062012)}
+.fb-nc{text-align:center;font-size:12px;color:var(--sub);font-weight:700;letter-spacing:.3px}
+.fb-vs{display:flex;align-items:center;justify-content:space-around;margin:12px 0}.fb-vs>div{display:flex;flex-direction:column;align-items:center;gap:6px;width:38%;text-align:center;font-weight:700;font-size:13px}.fb-vs>b{font-size:30px;font-weight:900}
+.fb-row{display:flex;gap:8px;flex-wrap:wrap}.fb-row .fb-btn.big{flex:2;margin-top:0}.fb-row .fb-btn{flex:1}
+.fb-live{text-align:center;color:#fde047;font-weight:700;margin-bottom:8px}
+.fb-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));gap:6px;margin-top:12px}.fb-stats>div{background:rgba(255,255,255,.06);border-radius:12px;padding:8px 4px;text-align:center}.fb-stats b{font-size:18px;display:block}.fb-stats b.hi{color:#fde047}.fb-stats small{font-size:10px;color:var(--mut)}
+.fb-list{display:flex;flex-direction:column;gap:5px}
+.fb-li{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.05);text-align:left;width:100%}
+.fb-li .grow{flex:1;min-width:0;display:flex;flex-direction:column;font-weight:600;font-size:13px}.fb-li small{color:var(--mut2);font-size:11px;font-weight:500}
+.fb-li.me{background:rgba(253,224,71,.16);border:1px solid rgba(253,224,71,.5)}.fb-li.nx{border:1px solid var(--acc)}
+.fb-wdl{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:11px;font-weight:800;background:rgba(255,255,255,.1);flex:none}.fb-wdl.w{background:#16a34a}.fb-wdl.d{background:#64748b}.fb-wdl.l{background:#b91c1c}
+.fb-r{min-width:32px;text-align:center;font-weight:800;padding:2px 5px;border-radius:7px;background:rgba(255,255,255,.1);font-size:12px}.fb-r.hi{background:#ca8a04;color:#fff}.fb-r.fbr-lo{background:#7f1d1d}
+.fb-no{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-weight:900;font-size:12px;flex:none}
+.fb-news>div{padding:8px 10px;border-left:3px solid var(--acc);background:rgba(255,255,255,.04);margin-bottom:5px;border-radius:0 10px 10px 0;font-size:13px}
+.fb-kits{display:flex;justify-content:center;gap:24px;padding:10px;border-radius:16px;background:radial-gradient(circle,var(--panel2),var(--panel))}
+.fb-sel{width:100%;padding:10px;border-radius:12px;background:var(--panel);color:#fff;border:1px solid rgba(255,255,255,.2);font-size:14px;margin-bottom:8px}
+.fb-tbl{width:100%;border-collapse:collapse;font-size:12px}.fb-tbl th{color:var(--mut2);font-weight:600;padding:5px 2px}.fb-tbl td{padding:5px 2px;text-align:center;border-top:1px solid rgba(255,255,255,.06)}
+.fb-tbl .l{text-align:left;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}.fb-tbl tr.me td{background:rgba(253,224,71,.16);font-weight:700}
+.z{border-left:3px solid transparent}.z.ucl{border-color:#3b82f6}.z.uel{border-color:#f97316}.z.uecl{border-color:#22c55e}
+.fb-leg{font-size:11px;color:var(--mut2);margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;align-items:center}.fb-leg .z{display:inline-block;width:0;height:12px;margin-left:6px}
+.fb-stage{margin:10px 0}.fb-stage>b{display:block;margin-bottom:5px;color:var(--sub)}
+.fb-tie{display:flex;align-items:center;gap:6px;font-size:12px;padding:5px 8px;border-radius:9px;background:rgba(255,255,255,.04);margin-bottom:3px}.fb-tie span{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--mut)}.fb-tie span:last-child{text-align:right}.fb-tie span.w{color:#fff;font-weight:700}.fb-tie>b{min-width:44px;text-align:center}.fb-tie.me{border:1px solid rgba(253,224,71,.6)}
+.fb-champ{padding:12px;border-radius:14px;background:linear-gradient(135deg,#ca8a04,#713f12);font-weight:800;text-align:center;margin-top:10px}
+.fb-tip{margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.35);font-size:12.5px;line-height:1.5;color:#dbeafe}
+.fb-tro{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px}.fb-tro>div{display:flex;flex-direction:column;align-items:center;text-align:center;padding:10px 6px;border-radius:14px;background:linear-gradient(160deg,rgba(234,179,8,.25),rgba(0,0,0,.2));font-size:12px}.fb-tro span{font-size:30px}.fb-tro small{color:var(--mut)}
+.fb-vol{display:flex;flex-direction:column;gap:10px}.fb-vol label{display:flex;flex-direction:column;font-size:13px;gap:4px;color:var(--sub)}
+.fb input[type=range]{width:100%;accent-color:var(--acc);height:28px}
+.fb-se{text-align:center}.fb-se h2{margin:10px 0}.fb-se h3{margin:18px 0 8px}.fb-se p{margin:8px 0}
+.fb-off{border:1px solid color-mix(in srgb,var(--acc) 55%,transparent)}.fb-off>b{color:var(--acc2);font-size:13px}
+.fb-pre .fb-xis{display:flex;gap:8px;margin-top:6px}.fb-xi{flex:1;padding:8px;border-radius:12px;background:rgba(255,255,255,.05);border-top:4px solid var(--c)}
+.fb-xi h5{text-align:center;margin-bottom:4px}.fb-xi div{font-size:12px;padding:3px 0;display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden}.fb-xi i{font-style:normal;width:22px;text-align:center;font-weight:800;color:var(--mut)}.fb-xi .me{color:#fde047;font-weight:800}
+.fb-post{text-align:center}.fb-post h3{margin:4px 0 2px;font-size:22px}.fb-post.w h3{color:#4ade80}.fb-post.l h3{color:#f87171}
+.fb-ev{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:10px 0;font-size:12px}.fb-ev span{background:rgba(255,255,255,.07);padding:4px 8px;border-radius:999px}
+.fb-res{display:flex;flex-direction:column;gap:3px;font-size:12px}.fb-res>div{display:flex;align-items:center;padding:5px 8px;border-radius:8px;background:rgba(255,255,255,.04)}.fb-res span{flex:1;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.fb-res span:last-child{text-align:right}.fb-res b{width:42px}.fb-res .me{background:rgba(253,224,71,.16);font-weight:700}
+/* match */
+.fb-mw{position:absolute;inset:0;z-index:5;background:#0b120d}
+.fbm{position:absolute;inset:0;overflow:hidden;touch-action:none}
+.fbm-cv{position:absolute;inset:0;display:block;touch-action:none}
+.fbm-sb{position:absolute;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.72);padding:5px 10px;border-radius:12px;font-size:14px;box-shadow:0 3px 12px #0007;pointer-events:none;white-space:nowrap}
+.fbm-t{display:flex;align-items:center;gap:5px}.fbm-sc{font-size:20px;font-weight:900;min-width:58px;text-align:center}.fbm-min{background:#16a34a;border-radius:7px;padding:2px 7px;font-weight:800;font-size:12px}
+.fbm-sub{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 44px);left:50%;transform:translateX(-50%);display:flex;gap:8px;font-size:11px;pointer-events:none;white-space:nowrap}.fbm-sub span{background:rgba(0,0,0,.55);padding:2px 8px;border-radius:999px}
+.fbm-rt{color:#fde047;font-weight:800}.fbm-rt.bump{animation:bmp .4s}
+.fbm-pause{position:absolute;top:max(8px,env(safe-area-inset-top));right:8px;width:40px;height:40px;border-radius:12px;background:rgba(0,0,0,.6);font-size:18px}
+.fbm-ban{position:absolute;left:0;right:0;top:34%;text-align:center;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:4px}
+.fbm-ban b{font-size:54px;font-weight:900;font-style:italic;letter-spacing:1px;color:#fde047;text-shadow:0 4px 0 #b45309,0 8px 24px #000}.fbm-ban b.sm{font-size:26px;color:#86efac;text-shadow:0 3px 0 #14532d,0 6px 18px #000}
+.fbm-ban span{background:rgba(0,0,0,.65);padding:5px 12px;border-radius:10px;font-weight:700}
+.fbm-ban.on{animation:fbban .5s cubic-bezier(.2,1.6,.4,1)}
+@keyframes fbban{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+.fbm-pop{position:absolute;left:50%;top:24%;transform:translateX(-50%);font-weight:900;font-size:20px;text-shadow:0 2px 6px #000;opacity:0;pointer-events:none;white-space:nowrap}
+.fbm-pop.on{animation:fbpop 1.4s ease-out}
+@keyframes fbpop{0%{opacity:0;transform:translate(-50%,10px) scale(.7)}15%{opacity:1;transform:translate(-50%,0) scale(1.1)}70%{opacity:1}100%{opacity:0;transform:translate(-50%,-24px)}}
+.fbm-mom{position:absolute;left:8px;right:8px;bottom:max(10px,env(safe-area-inset-bottom));background:rgba(0,0,0,.72);border-radius:16px;padding:9px 12px;border:1px solid rgba(253,224,71,.5)}
+.fbm-mt{font-weight:800;color:#fde047;font-size:14px}.fbm-hint{font-size:11.5px;color:var(--sub);margin:4px 0}
+.fbm-bar{height:5px;border-radius:3px;background:rgba(255,255,255,.15);overflow:hidden;margin-top:5px}.fbm-bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ef4444,#fde047,#22c55e)}
+.fbm-ctl{display:flex;gap:10px;align-items:center}.fbm-lob{padding:7px 12px;border-radius:10px;background:rgba(255,255,255,.12);font-weight:700;font-size:13px}.fbm-lob.on{background:#0ea5e9;color:#fff}
+.fbm-curve{flex:1;display:flex;align-items:center;gap:6px;font-size:12px}.fbm-curve input{flex:1;accent-color:#fde047}
+.fbm-ov{position:absolute;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;z-index:3}
+.fbm-card{width:min(92%,380px);background:var(--panel);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:18px;text-align:center;display:flex;flex-direction:column;gap:10px;animation:fbban .35s}
+.fbm-h{font-size:22px;font-weight:900}.fbm-fs{display:flex;align-items:center;justify-content:center;gap:14px}.fbm-fs b{font-size:34px}
+.fbm-ev{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;font-size:12px}.fbm-ev span{background:rgba(255,255,255,.08);padding:3px 8px;border-radius:999px}
+.fbm-btn{padding:12px;border-radius:12px;background:rgba(255,255,255,.1);font-weight:800;font-size:15px}.fbm-btn.pri{background:linear-gradient(180deg,var(--acc),var(--accd));color:var(--onacc)}
+.fbm-vol{display:flex;flex-direction:column;gap:6px;text-align:left}.fbm-vol label{display:flex;flex-direction:column;font-size:12px;color:var(--sub)}.fbm-vol input{accent-color:var(--acc)}
+.fb-sk{padding:12px;border-radius:14px;background:rgba(255,255,255,.06);margin-bottom:8px}
+.fb-skh{display:flex;justify-content:space-between;align-items:center;margin:4px 0}.fb-skh span{color:var(--mut);font-weight:600}
+.fb-skb{height:12px;border-radius:7px;background:rgba(255,255,255,.1);overflow:hidden;margin:6px 0}.fb-skb i{display:block;height:100%;background:linear-gradient(90deg,#f59e0b,#fde047);border-radius:7px}
+.fb-skb i.anim{animation:fbsk 1s ease-out}@keyframes fbsk{from{width:var(--from)}}
+.fb-up{color:#4ade80}.fb-dn{color:#f87171}
+.fb-perf{display:flex;gap:8px;margin:12px 0 6px}.fb-perf>div{flex:1;padding:10px;border-radius:12px;background:rgba(255,255,255,.06);display:flex;flex-direction:column;gap:2px}.fb-perf small{color:var(--mut);font-size:11px}.fb-perf b{font-size:22px}
+.fb-perf.w b{color:#4ade80}.fb-perf.l b{color:#f87171}.fb-perf.d b{color:#fde047}
+.fb-mvp{padding:9px;border-radius:12px;background:rgba(255,255,255,.05);font-size:13px;color:var(--sub)}.fb-mvp.on{background:linear-gradient(135deg,#ca8a04,#713f12);color:#fff;font-size:15px;animation:fbban .5s cubic-bezier(.2,1.6,.4,1)}
+.fb-prow{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:10px 0;text-align:left}.fb-prow>div{display:flex;justify-content:space-between;padding:6px 10px;border-radius:9px;background:rgba(255,255,255,.04);font-size:12.5px}.fb-prow span{color:var(--mut)}.fb-prow .bad b{color:#f87171}
+.fb-skc{padding:12px;border-radius:14px;background:rgba(0,0,0,.25);border:1px solid rgba(253,224,71,.3);text-align:left}
+.fb-skl{display:flex;justify-content:space-between;font-size:13px;margin:3px 0}.fb-skl.tot{margin-top:8px;font-weight:700}.fb-skl b{font-size:15px}
+.fb-gain{margin-top:8px;padding:10px;border-radius:10px;background:var(--accd);color:var(--onaccd);font-weight:800;text-align:center;animation:fbban .5s cubic-bezier(.2,1.6,.4,1)}.fb-gain small{display:block;font-weight:500;opacity:.85}
+.fb-lose{margin-top:6px;color:#fca5a5;font-size:12px;text-align:center}
+.fbm-rt.dn{color:#f87171}
+.fbm-tick{position:absolute;inset:0;background:radial-gradient(120% 70% at 50% 30%,rgba(10,30,18,.86),rgba(4,10,6,.95));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:90px 16px 20px;opacity:0;pointer-events:none;transition:opacity .35s}
+.fbm-tick.on{opacity:1;pointer-events:auto}
+.fbm-clock{font-size:64px;font-weight:900;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 4px 20px #000}
+.fbm-tl{color:#86efac;font-weight:700;font-size:14px;letter-spacing:.3px;animation:fbpl 1.2s infinite}@keyframes fbpl{50%{opacity:.55}}
+.fbm-feed{width:100%;max-width:420px;display:flex;flex-direction:column;gap:5px;min-height:170px}
+.fbm-feed>div{padding:8px 11px;border-radius:10px;background:rgba(255,255,255,.07);font-size:13px;color:#e5f3e8}
+.fbm-feed>div.new{animation:fbin .3s ease-out}@keyframes fbin{from{opacity:0;transform:translateY(-8px)}}
+.fbm-feed>div.mut{color:var(--mut2);background:rgba(255,255,255,.03)}.fbm-feed>div.gl{background:rgba(34,197,94,.3);font-weight:700}.fbm-feed>div.gc{background:rgba(239,68,68,.28);font-weight:700}.fbm-feed>div.me{border-left:3px solid #fde047}
+.fbm-feed small{color:var(--mut)}
+.fbm-ff{margin-top:6px;padding:11px 18px;border-radius:12px;background:rgba(255,255,255,.12);font-weight:800}
+.fbm-ban b.op{color:#f87171;text-shadow:0 4px 0 #7f1d1d,0 8px 24px #000}
+.fbm-sb,.fbm-sub,.fbm-pause{z-index:2}
+.fbm-hint b{color:#fde047}
+.fbm-shot{position:absolute;left:8px;right:8px;bottom:max(10px,env(safe-area-inset-bottom));display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:8px 10px;background:rgba(0,0,0,.76);border:1px solid rgba(253,224,71,.5);border-radius:18px;padding:10px 12px;z-index:2;animation:fbin .3s}
+.fbm-sh-l{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fbm-sh-t{font-weight:800;color:#fde047;font-size:14px}.fbm-sh-fx{font-weight:700;font-size:15px}.fbm-sh-pw{font-size:12px;color:var(--sub)}
+.fbm-sh-back{align-self:flex-start;padding:7px 11px;border-radius:10px;background:rgba(255,255,255,.12);font-size:12px;font-weight:700;margin-top:2px}
+.fbm-sball{grid-row:1/3;grid-column:2;position:relative;width:150px;height:150px;touch-action:none}
+.fbm-sb-ball{position:absolute;inset:18px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff 0,#eee 45%,#bbb 100%);box-shadow:0 4px 14px #000a,inset -6px -8px 14px rgba(0,0,0,.18);touch-action:none}
+.fbm-sb-ball::before{content:'';position:absolute;left:50%;top:50%;width:26%;height:26%;transform:translate(-50%,-50%) rotate(18deg);background:#222;clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%);opacity:.85}
+.fbm-sb-ball::after{content:'';position:absolute;inset:0;border-radius:50%;background:linear-gradient(transparent 49.5%,rgba(0,0,0,.18) 49.5% 50.5%,transparent 50.5%),linear-gradient(90deg,transparent 49.5%,rgba(0,0,0,.18) 49.5% 50.5%,transparent 50.5%)}
+.fbm-sb-ball i{position:absolute;width:22px;height:22px;border-radius:50%;transform:translate(-50%,-50%);background:rgba(239,68,68,.85);border:3px solid #fff;box-shadow:0 0 0 2px #ef4444,0 0 12px #ef4444;z-index:1;left:50%;top:50%}
+.fbm-sball span{position:absolute;font-size:10px;font-weight:700;color:var(--sub);text-align:center;line-height:1.1;pointer-events:none}
+.fbm-sball .sb-t{top:0;left:0;right:0}.fbm-sball .sb-b{bottom:0;left:0;right:0}.fbm-sball .sb-l{left:-8px;top:50%;transform:translateY(-50%)}.fbm-sball .sb-r{right:-8px;top:50%;transform:translateY(-50%)}
+.fbm-sh-go{grid-column:1;padding:13px;border-radius:14px;background:linear-gradient(180deg,#ef4444,#b91c1c);font-weight:900;font-size:18px;box-shadow:0 3px 0 #7f1d1d;color:#fff}
+.fbm-sh-go:active{transform:scale(.96)}
+@media (orientation:landscape){.fbm-shot{left:auto;right:8px;width:340px}}
+.fb-king{display:flex;gap:6px;width:100%;margin-top:10px;text-align:left}.fb-king>div{flex:1;padding:9px 10px;border-radius:12px;background:linear-gradient(135deg,rgba(234,179,8,.18),rgba(255,255,255,.04));display:flex;flex-direction:column;gap:1px;min-width:0}
+.fb-king span{font-size:11px;color:var(--sub);font-weight:700}.fb-king b{font-size:22px;color:#fde047}.fb-king small{font-size:10.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fb-rk{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:12px;font-weight:800;background:rgba(255,255,255,.08);flex:none}.fb-rk.m0{background:#ca8a04;color:#fff}.fb-rk.m1{background:#94a3b8;color:#111}.fb-rk.m2{background:#b45309;color:#fff}
+.fb-kv{font-size:18px;min-width:28px;text-align:right}.fb-sep{text-align:center;color:var(--mut2);line-height:.8}
+.fbm-dist{display:block;font-style:normal;font-weight:900;font-size:22px;color:#fff;letter-spacing:2px;background:rgba(0,0,0,.6);padding:3px 12px;border-radius:10px;animation:fbban .5s .25s both cubic-bezier(.2,1.6,.4,1)}
+.fb-dist{margin:8px 0;padding:8px;border-radius:12px;background:color-mix(in srgb,var(--acc) 15%,transparent);font-size:13px}
+.fb-cm{margin-top:12px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.05);border-left:3px solid #f59e0b;text-align:left;font-size:13px;line-height:1.45;display:flex;flex-direction:column;gap:6px}
+.fb-cmh{font-weight:800;color:#fbbf24}.fb-cm b{color:#fde68a}
+.fb-news2{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.fb-nw{padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.05);border-left:4px solid var(--nc,#888);text-align:left}
+.fb-nw.p2,.fb-nw.p3{background:linear-gradient(135deg,color-mix(in srgb,var(--nc) 28%,transparent),rgba(255,255,255,.04))}.fb-nw.p3 .fb-nwh,.fb-nw.p2 .fb-nwh{font-size:16px}
+.fb-nw.sm{padding:7px 10px;margin-bottom:5px}.fb-nw.sm .fb-nwh{font-size:13px}
+.fb-nwt{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}.fb-nwt span{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;color:#081008}.fb-nwt small{font-size:10.5px;color:var(--mut2)}
+.fb-nwh{display:block;font-size:14px;line-height:1.3}.fb-nw p{font-size:12.5px;color:var(--sub);margin-top:4px;line-height:1.4}
+.fb-hl{display:block;width:100%;text-align:left}
+.fb-nw.potm{background:linear-gradient(160deg,rgba(234,179,8,.3),rgba(120,53,15,.25));border-left-color:#eab308}
+.fb-pod{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:6px;margin-top:8px;align-items:end}.fb-pod>div{display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px;padding:8px 4px;border-radius:12px;background:rgba(0,0,0,.25)}
+.fb-pod .pd0{order:2;padding-top:14px;background:rgba(234,179,8,.25)}.fb-pod .pd1{order:1}.fb-pod .pd2{order:3}.fb-pod em{font-style:normal;font-size:20px}.fb-pod b{font-size:12px}.fb-pod small{font-size:10px;color:var(--sub)}.fb-pod .me{outline:2px solid #fde047}
+.fb-king small b{font-size:inherit;color:#fde047}
+
+/* bottom navigation (hub) */
+.fb-bnav{display:grid;grid-template-columns:repeat(5,1fr);flex:none;padding:4px 4px max(6px,env(safe-area-inset-bottom));background:color-mix(in srgb,var(--bg3) 88%,transparent);border-top:1px solid var(--line);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);position:relative;z-index:3}
+.fb-bnav[hidden]{display:none}
+.fb-bnav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:52px;padding:4px 0;color:var(--mut2);font-size:10.5px;font-weight:700;letter-spacing:.1px;border-radius:12px;transition:color .2s,transform .1s;min-width:0}
+.fb-bnav button:active{transform:scale(.92)}
+.fb-bnav i{position:relative;font-style:normal;font-size:19px;line-height:1;display:grid;place-items:center;width:46px;height:28px;border-radius:999px;transition:background .25s;filter:grayscale(.7) opacity(.75)}
+.fb-bnav span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.fb-bnav button.on{color:var(--acc2)}.fb-bnav button.on i{background:color-mix(in srgb,var(--acc) 26%,transparent);filter:none}
+.fb-bnav em{position:absolute;top:-3px;right:2px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;font-style:normal;font-weight:800;line-height:17px;box-shadow:0 0 0 2px var(--bg3)}
+.fb.navon .fb-main{padding-bottom:16px}
+.fb-seg{display:flex;gap:3px;margin:10px 0 2px;padding:3px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid var(--line)}
+.fb-seg button{flex:1;min-width:0;padding:8px 2px;border-radius:9px;font-size:12.5px;font-weight:700;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .2s,color .2s}
+.fb-seg button.on{background:var(--acc);color:var(--onacc);box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.fb-tab.in{animation:fbtab .24s ease-out}@keyframes fbtab{from{opacity:0;transform:translateY(8px)}}
+.fb-top button[hidden]{display:none}
+/* season review */
+.fb-se2{display:flex;flex-direction:column;gap:10px;padding-bottom:8px}
+.se-hero{display:flex;align-items:center;gap:12px;padding:14px;border-radius:18px;background:linear-gradient(135deg,var(--panel2),var(--panel));border:1px solid var(--line);animation:fbtab .3s ease-out}
+.se-hero>div:nth-child(2){flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.se-hero small{font-size:11.5px;color:var(--mut);font-weight:700}.se-hero h2{font-size:20px;margin:0;line-height:1.15}.se-hero span{font-size:12.5px;color:var(--sub)}
+.se-pos{flex:none;width:62px;height:62px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(255,255,255,.08);line-height:1}.se-pos b{font-size:30px;font-weight:900}.se-pos small{font-size:9.5px;font-weight:800;color:var(--mut);margin-top:2px}
+.se-pos.top{background:var(--acc);color:var(--onacc)}.se-pos.top small{color:inherit;opacity:.75}.se-pos.gold{background:linear-gradient(160deg,#fde047,#ca8a04);color:#1a1300}.se-pos.gold small{color:inherit}
+.se-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.se-grid>div{padding:9px 4px;border-radius:12px;background:rgba(255,255,255,.06);text-align:center;min-width:0}.se-grid b{display:block;font-size:20px;font-weight:900}.se-grid small{font-size:10.5px;color:var(--mut)}.se-grid .hi b{color:var(--acc2)}
+.se-h{margin:8px 0 0;font-size:14px;color:var(--sub);text-align:left}.se-sub{margin:-4px 0 0;font-size:12.5px;text-align:left}
+.se-aws{display:grid;grid-template-columns:1fr;gap:6px}
+.se-aw{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:linear-gradient(135deg,rgba(234,179,8,.14),rgba(255,255,255,.03));border:1px solid rgba(234,179,8,.22);text-align:left}
+.se-aw.me{background:linear-gradient(135deg,rgba(234,179,8,.42),rgba(120,53,15,.3));border-color:#fde047}
+.se-awi{font-size:26px;flex:none;width:36px;text-align:center}.se-awb{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}.se-awb small{font-size:10.5px;font-weight:800;color:#fcd34d;text-transform:uppercase;letter-spacing:.4px}.se-awb b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.se-awb span{font-size:11.5px;color:var(--mut);display:flex;align-items:center;gap:4px}.se-awb em{font-style:normal;font-size:11px;color:var(--acc2);font-weight:700}
+.se-potm{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}.se-potm>div{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:10px;background:rgba(255,255,255,.05);font-size:12px;min-width:0}.se-potm small{width:48px;flex:none;color:var(--mut);font-size:10.5px;font-weight:700}.se-potm b{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}.se-potm span{color:var(--mut2);font-size:10.5px;flex:none}.se-potm .me{background:rgba(253,224,71,.18);outline:1px solid #fde047}
+.se-offs{display:flex;flex-direction:column;gap:8px}
+.se-off{display:flex;align-items:center;gap:10px;width:100%;padding:12px 12px 12px 16px;border-radius:16px;text-align:left;position:relative;overflow:hidden;background:linear-gradient(110deg,color-mix(in srgb,var(--c1) 30%,var(--panel)) 0,var(--panel) 70%);border:1px solid var(--line);transition:transform .1s}
+.se-off::before{content:'';position:absolute;left:0;top:0;bottom:0;width:6px;background:linear-gradient(var(--c1) 50%,var(--c2) 50%)}
+.se-off:active{transform:scale(.98)}
+.se-ofi{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.se-ofi b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.se-ofi small{font-size:11.5px;color:var(--mut)}.se-ofi em{font-style:normal;font-weight:800}
+.se-ofi i{display:block;height:5px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden;margin:3px 0 1px;max-width:180px}.se-ofi u{display:block;height:100%;background:var(--acc)}
+.se-off strong{flex:none;padding:8px 12px;border-radius:10px;background:var(--acc);color:var(--onacc);font-size:13px}
+.se-card{padding:14px;border-radius:16px;background:rgba(255,255,255,.05);text-align:center}.se-card p{margin:8px 0;color:var(--sub)}
+/* polish: consistent press feedback and focus rings */
+.fb-li,.fb-chip,.fb-team,.fb-hl,.fb-king,.fb-slot button,.se-aw,.fb-seg button{transition:transform .1s,background .2s,border-color .2s}
+button.fb-li:active,.fb-chip:active,.fb-team:active,.fb-hl:active,.fb-king:active,.fb-seg button:active,.fb-top button:active{transform:scale(.97)}
+.fb button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.fb-main>*{min-width:0}
+/* haptics toggle in the sound settings */
+.fb-hap{flex-direction:row!important;align-items:center;justify-content:space-between;gap:10px}.fb-hap input{width:22px;height:22px;accent-color:var(--acc);flex:none}
+
+/* ---------- v14.2 design pass ---------- */
+.fb{--fd:"Avenir Next Condensed","Roboto Condensed","sans-serif-condensed","Arial Narrow","Helvetica Neue",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+/* condensed display type for titles, names and hero numbers */
+.fb-title,.fb-hero h2,.se-h,.se-hero h2,.se-pos b,.fb-ovr b,.fb-stats b,.se-grid b,.fb-vs>b,.fb-post h3,.fb-king b,.fbm-sc,.fb-h4,.fb-kv,.fb-pts,.fb-skh b,.se-awb b,.fb-nw.lead .fb-nwh{font-family:var(--fd)}
+.fb-title{text-transform:uppercase;letter-spacing:.06em;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.se-h,.fb-h4{text-transform:uppercase;letter-spacing:.06em}
+/* tap targets ≥ 44px */
+.fb-seg button{min-height:44px}
+.fb-att .fb-btn{min-width:44px;min-height:44px}
+/* icons */
+.ico{width:1.15em;height:1.15em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.2em;flex:none}
+.fb-bnav i{filter:none;opacity:.8}.fb-bnav i .ico{width:22px;height:22px}.fb-bnav button.on i{opacity:1}
+.fb-nwt span .ico{width:1.1em;height:1.1em;stroke-width:2.4}
+/* title: wordmark over faint pitch lines */
+.gb-hero{position:relative;padding:34px 0 22px;overflow:hidden}
+.gb-pitch{position:absolute;left:50%;top:0;width:520px;max-width:none;transform:translateX(-50%);height:100%;fill:none;stroke:rgba(255,255,255,.07);stroke-width:1;pointer-events:none}
+.gb-word{position:relative;margin:0;font-family:var(--fd);font-size:clamp(34px,12.5vw,56px);white-space:nowrap;line-height:.95;font-weight:900;font-style:italic;letter-spacing:.01em;text-transform:uppercase}
+.gb-word span{color:var(--tx)}.gb-word em{color:var(--acc);font-style:italic}
+.gb-hero p{position:relative;margin-top:10px;font-size:13px;letter-spacing:.02em}
+/* save slots as matchday ticket stubs */
+.fb-slot{position:relative;padding-left:46px;-webkit-mask:radial-gradient(circle 7px at 34px 0,#0000 97%,#000) top/100% 51% no-repeat,radial-gradient(circle 7px at 34px 100%,#0000 97%,#000) bottom/100% 51% no-repeat;mask:radial-gradient(circle 7px at 34px 0,#0000 97%,#000) top/100% 51% no-repeat,radial-gradient(circle 7px at 34px 100%,#0000 97%,#000) bottom/100% 51% no-repeat}
+.fb-slot::before{content:attr(data-no);position:absolute;left:0;top:0;bottom:0;width:34px;display:grid;place-items:center;writing-mode:vertical-rl;transform:rotate(180deg);font:800 10px var(--fd);letter-spacing:.22em;color:var(--mut2);border-left:2px dashed rgba(255,255,255,.16)}
+/* career profile: balanced 3×2 grid, running season row */
+.fb-stats.k3{grid-template-columns:repeat(3,1fr)}
+.fb-li.now{border:1px dashed color-mix(in srgb,var(--acc) 55%,transparent)}
+/* news: one scrollable filter row, lead story */
+.fb-chips.scroll{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:4px -12px;padding:2px 12px}.fb-chips.scroll::-webkit-scrollbar{display:none}.fb-chips.scroll .fb-chip{flex:none}
+.fb-nw.lead{padding:14px 14px 12px}.fb-nw.lead .fb-nwh{font-size:19px;line-height:1.2}
+/* league table form dots */
+.fb-fm{display:inline-flex;gap:2px}.fb-fm i{width:6px;height:6px;border-radius:50%;background:#64748b}.fb-fm i.G{background:#22c55e}.fb-fm i.M{background:#ef4444}
+@media (max-width:379px){.fb-tbl .fm{display:none}}
+/* development help folds away */
+.fb-help{margin-top:12px}.fb-help summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:6px;color:var(--acc2);font-weight:700;font-size:13px;list-style:none}.fb-help summary::-webkit-details-marker{display:none}.fb-help summary::before{content:'?';width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--acc);color:var(--onacc);font-size:12px}.fb-help .fb-tip{margin-top:4px}
+/* squad: compact kit preview */
+.fb-kits{padding:6px;gap:18px}
+/* post-match: left-aligned section title */
+.fb-h4{text-align:left;margin:16px 0 8px;font-size:14px;color:var(--sub)}
+/* broadcast score boxes */
+.fb-scb{display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:6px;background:#050505;border-bottom:2px solid var(--acc);font-family:var(--fd);font-size:15px;min-width:44px;justify-content:center}.fb-scb i{font-style:normal;opacity:.5}
+.fb-led{font-family:var(--fd);font-size:44px;padding:4px 14px;border-radius:12px;background:#050505;border:1px solid var(--line);line-height:1.1}
+.fb-led span{display:inline-flex;gap:8px;align-items:center;color:transparent;background-image:radial-gradient(circle,var(--led,#fff) 55%,transparent 62%);background-size:3.4px 3.4px;-webkit-background-clip:text;background-clip:text}
+.fb-led i{font-style:normal}
+.fb-post.w .fb-led{--led:#4ade80}.fb-post.l .fb-led{--led:#f87171}
+/* season review position as an LED board */
+.se-pos{background:#050505;border:1px solid var(--line)}
+.se-pos b{font-size:38px;color:transparent;background-image:radial-gradient(circle,var(--led,#fff) 55%,transparent 62%);background-size:3.4px 3.4px;-webkit-background-clip:text;background-clip:text}
+.se-pos.top,.se-pos.gold{background:#050505;color:inherit}.se-pos.top{--led:var(--acc)}.se-pos.gold{--led:#fde047;box-shadow:0 0 0 2px #ca8a04}
+.se-pos small{color:var(--mut)!important}
+/* home: leader names may wrap to a second line */
+.fb-king small{white-space:normal}
+/* match aim panel: easier to read hint */
+.fbm-hint{font-size:12.5px;line-height:1.35}
+/* screen-to-screen transition */
+.fb-main.scr{animation:fbscr .2s ease-out}@keyframes fbscr{from{opacity:0;transform:translateY(6px)}}
+@media (prefers-reduced-motion:reduce){.fb *,.fb *::before,.fb *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+.fbm-sb{background:rgba(6,6,6,.93)}   /* solid broadcast scorebug: the pitch no longer shows through */
+.fb-btn{min-height:44px}
