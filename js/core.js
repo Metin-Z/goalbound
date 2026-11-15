@@ -107,6 +107,7 @@ const FBA = (() => {
     const s2 = ctx.createBufferSource(); s2.buffer = nb; s2.loop = true; const b2 = ctx.createBiquadFilter(); b2.type = 'bandpass'; b2.frequency.value = 1300; b2.Q.value = .9;
     crowdG2 = ctx.createGain(); crowdG2.gain.value = 0; s2.connect(b2); b2.connect(crowdG2); crowdG2.connect(crowd); s2.start(0, R() * 2);
     const l2 = ctx.createOscillator(), lg2 = ctx.createGain(); l2.frequency.value = 6.2; lg2.gain.value = .02; l2.connect(lg2); lg2.connect(crowdG2.gain); l2.start();
+    setTimeout(bake, 400);   // pre-render the heavy crowd sounds in the background
   }
   // Android/iOS only allow audio after a real gesture (touchend / click / key): retry there and prime with a silent buffer
   function unlock() {
@@ -140,6 +141,40 @@ const FBA = (() => {
   }
   // Crowd applause: dozens of individual hand claps scattered over time
   function claps(n, dur, g, t0 = 0) { for (let i = 0; i < n; i++) noise(.035 + R() * .03, 'bandpass', 1100 + R() * 1600, g * (.5 + R() * .5), t0 + R() * dur, 0, 1.3, crowd, .002); }
+  // Crowd recipes: heavy many-voice syntheses. Rendered once into buffers (see bake) so a goal costs 3 nodes instead of ~1000.
+  const CROWD = {
+    goal: [7.6, () => { voices(24, 160, 4.6, 1.5, 'ah', [1.18, 1.05]); noise(4.8, 'bandpass', 1000, 1.3, 0, 700, .5, crowd, .2); claps(90, 3.5, .5, .6); chantSynth(2.8); }, 3],
+    ooh: [2, () => voices(16, 170, 1.8, .55, 'oo', [1.12, .82]), 3],
+    groan: [1.7, () => voices(14, 160, 1.5, .42, 'oh', [1, .8]), 2],
+    boo: [2.3, () => { voices(18, 135, 2.1, .55, 'oo', [.97, .92]); noise(1.8, 'bandpass', 520, .3, 0, 0, 1.2, crowd, .3); }, 2],
+    clap: [1.7, () => claps(70, 1.4, .55), 2],
+    chant: [4.5, () => chantSynth(0), 2],
+    applause: [2.5, () => claps(60, 2, .45, .2), 1]
+  };
+  // Rhythmic terrace chant: three claps + a sung "oh"
+  function chantSynth(delay) { for (let b = 0; b < 3; b++) [0, .3, .6].forEach(o => claps(18, .05, .5, delay + b * 1.2 + o)); voices(16, 200, 3.2, .4, 'oh', [1, 1], delay); }
+  const baked = {};
+  // Render one recipe offline: temporarily point the synth helpers at an OfflineAudioContext
+  function bakeOne(dur, fn) {
+    const live = [ctx, crowd, sfx], off = new OfflineAudioContext(2, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate), bus = off.createGain();
+    bus.connect(off.destination); ctx = off; crowd = sfx = bus;
+    try { fn(); } finally { [ctx, crowd, sfx] = live; }
+    return off.startRendering();
+  }
+  // Pre-render every crowd recipe (a few variations each), one at a time in the background
+  async function bake() {
+    if (!window.OfflineAudioContext) return;
+    for (const [name, [dur, fn, n]] of Object.entries(CROWD)) for (let i = 0; i < n; i++) {
+      try { (baked[name] || (baked[name] = [])).push(await bakeOne(dur, fn)); } catch (e) { return; }
+      await new Promise(r => setTimeout(r, 30));   // leave room for the game between renders
+    }
+  }
+  // Play a crowd sound: a pre-rendered variation (slightly re-pitched) or, until baking is done, the live synthesis
+  function crowdFx(name, delay = 0) {
+    const list = baked[name];
+    if (!list || !list.length) { if (delay) setTimeout(CROWD[name][1], delay * 1000); else CROWD[name][1](); return; }
+    const s = ctx.createBufferSource(); s.buffer = list[(R() * list.length) | 0]; s.playbackRate.value = .97 + R() * .06; s.connect(crowd); s.start(ctx.currentTime + delay);
+  }
   const S = {
     // Foot on ball: leather slap (mid band, carries on phone speakers) + short pitch-dropping body + air tick
     kick(p = .5) { if (!ok('kick', .05)) return; noise(.04 + p * .03, 'bandpass', 1300 + p * 700, .5 + p * .4, 0, 700, 1.2, sfx, .0015); tone(180 + p * 70, .08 + p * .04, 'triangle', .4 + p * .3, 0, 60, sfx, .002); noise(.012, 'highpass', 5000, .15 + p * .15, 0, 0, .7, sfx, .001); },
@@ -162,20 +197,19 @@ const FBA = (() => {
       if (type === 'short') blow(0, .3); else if (type === 'long') blow(0, 1); else { blow(0, .38); blow(.55, .38); blow(1.1, 1.15); }
     },
     // Goal: the stadium erupts — big "aah" roar, roar noise swell, applause, then the chant
-    goal() { if (!ok('goal', 2)) return; voices(24, 160, 4.6, 1.5, 'ah', [1.18, 1.05]); noise(4.8, 'bandpass', 1000, 1.3, 0, 700, .5, crowd, .2); claps(90, 3.5, .5, .6); S.chant(2.8); },
-    ooh() { if (!ok('ooh', 1.2)) return; voices(16, 170, 1.8, .55, 'oo', [1.12, .82]); },
-    groan() { if (!ok('groan', 1.2)) return; voices(14, 160, 1.5, .42, 'oh', [1, .8]); },
+    goal() { if (ok('goal', 2)) { last.chant = ctx.currentTime + 2.8; crowdFx('goal'); } },
+    ooh() { if (ok('ooh', 1.2)) crowdFx('ooh'); },
+    groan() { if (ok('groan', 1.2)) crowdFx('groan'); },
     // Home crowd booing an opponent's foul: low, steady "oo" with a rumble underneath
-    boo() { if (!ok('boo', 2)) return; voices(18, 135, 2.1, .55, 'oo', [.97, .92]); noise(1.8, 'bandpass', 520, .3, 0, 0, 1.2, crowd, .3); },
-    clap() { if (!ok('clap', 1.5)) return; claps(70, 1.4, .55); },
+    boo() { if (ok('boo', 2)) crowdFx('boo'); },
+    clap() { if (ok('clap', 1.5)) crowdFx('clap'); },
     net() { if (!ok('net', .5)) return; noise(.45, 'highpass', 2600, .22, 0, 0, .7, sfx, .006); noise(.3, 'bandpass', 650, .25, .02, 0, .8, sfx, .01); },
     // Ball on the post: short metallic "tonk" with inharmonic partials, then the crowd's "ooh"
     post() { if (!ok('post', .4)) return; [[620, .55, .2], [1490, .35, .1], [2630, .22, .06], [3900, .15, .03]].forEach(([f, d, g]) => tone(f, d, 'sine', g, 0, 0, sfx, .001)); noise(.04, 'bandpass', 2400, .35, 0, 0, 1.5, sfx, .001); setTimeout(() => S.ooh(), 140); },
     // Keeper's gloves: padded slap and a thud; the crowd reacts
     save(catchIt) { if (!ok('save', .3)) return; noise(.08, 'bandpass', catchIt ? 800 : 1500, .5, 0, 0, 1.1, sfx, .001); tone(120, .12, 'triangle', .3, 0, 60, sfx, .002); setTimeout(() => S.ooh(), 110); },
     tackle() { if (!ok('tackle', .25)) return; noise(.2, 'lowpass', 700, .32, 0, 200, 1, sfx, .003); tone(95, .12, 'triangle', .28, 0, 50); noise(.16, 'bandpass', 1400, .1, .03, 500, .8); },
-    // Rhythmic terrace chant: three claps + a sung "oh"
-    chant(delay = 0) { if (!ok('chant', 6)) return; for (let b = 0; b < 3; b++) [0, .3, .6].forEach(o => claps(18, .05, .5, delay + b * 1.2 + o)); voices(16, 200, 3.2, .4, 'oh', [1, 1], delay); },
+    chant(delay = 0) { if (ok('chant', 6)) crowdFx('chant', delay); },
     ui() { if (ok('ui', .04)) tone(1050, .04, 'sine', .09); },
     confirm() { if (ok('cf', .1)) { tone(660, .08, 'triangle', .12); tone(990, .12, 'triangle', .1, .06); } },
     back() { if (ok('bk', .1)) tone(520, .07, 'triangle', .08, 0, 380); },
@@ -183,7 +217,7 @@ const FBA = (() => {
     fanfare() {
       if (!ok('ff', 1)) return;
       [[523, 0], [659, .14], [784, .28], [1047, .46]].forEach(([f, t0]) => { const t = ctx.currentTime + t0, o = ctx.createOscillator(), o2 = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain(); o.type = o2.type = 'sawtooth'; o.frequency.value = f; o2.frequency.value = f * 1.004; lp.type = 'lowpass'; lp.frequency.setValueAtTime(500, t); lp.frequency.linearRampToValueAtTime(2600, t + .08); lp.frequency.exponentialRampToValueAtTime(900, t + .6); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.09, t + .03); g.gain.exponentialRampToValueAtTime(.001, t + (t0 > .4 ? 1.1 : .5)); o.connect(lp); o2.connect(lp); lp.connect(g); g.connect(sfx); [o, o2].forEach(x => { x.start(t); x.stop(t + 1.2); }); });
-      claps(60, 2, .45, .2);
+      crowdFx('applause');
     },
     sign() { if (ok('sg', 1)) [392, 523, 659, 784].forEach((f, i) => tone(f, .25, 'triangle', .12, i * .1)); },
     // Your moment: a broadcast-style whoosh while the crowd leans forward
@@ -196,6 +230,7 @@ const FBA = (() => {
     danger(x, y, pl) { const d = Math.min(Math.hypot(x - 34, y), Math.hypot(x - 34, pl - y)); this.crowdLevel(.3 + FBU.clamp(1 - (d - 8) / 28, 0, 1) * .65); },
     // Debug/test: a stream of the final mix (used to record and measure the sounds)
     _stream() { if (!ctx) return null; const d = ctx.createMediaStreamDestination(); out.connect(d); return d.stream; },
+    get baked() { return Object.fromEntries(Object.entries(baked).map(([k, v]) => [k, v.length])); },
     init, vol, unlock, get state() { return ctx ? ctx.state : 'none'; }, play(n, a) { if (!ctx) return; try { S[n] && S[n](a); } catch (e) {} },
     // Crowd intensity 0..1: louder and brighter as play gets dangerous
     crowdLevel(x) { if (!ctx) return; tension = x; const t = ctx.currentTime; crowdG.gain.setTargetAtTime(.1 + x * .32, t, .45); crowdF.frequency.setTargetAtTime(1300 + x * 1500, t, .45); crowdG2.gain.setTargetAtTime(Math.max(0, x - .45) * .22, t, .4); },
