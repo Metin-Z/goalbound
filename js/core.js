@@ -76,7 +76,7 @@ const FBT = {
   all: () => FB_LEAGUES.flatMap(l => FBT.ids(l.id)),
   badge(t, size = 34) {
     const c1 = t.c1, c2 = t.c2 === t.c1 ? '#ffffff' : t.c2;
-    return `<span class="fb-badge" style="width:${size}px;height:${size * 1.15}px;--b1:${c1};--b2:${c2};font-size:${Math.max(7, size * .26)}px">${size >= 18 ? `<i>${FBU.esc(t.abbr)}</i>` : ''}</span>`;
+    return `<span class="fb-badge" style="width:${size}px;height:${size * 1.15}px;--b1:${c1};--b2:${c2};font-size:${Math.max(7, size * (t.abbr.length > 2 ? .24 : .26))}px">${size >= 22 ? `<i>${FBU.esc(t.abbr)}</i>` : ''}</span>`;
   },
   ROLES: ['GK', 'LB', 'LCB', 'RCB', 'RB', 'LCM', 'CM', 'RCM', 'LW', 'ST', 'RW'],
   NUMS: { GK: 1, LB: 3, LCB: 4, RCB: 5, RB: 2, LCM: 8, CM: 6, RCM: 10, LW: 11, ST: 9, RW: 7 },
@@ -158,6 +158,7 @@ const FBX = {
   posDef: pos => ({ DF: .12, CM: .08, AM: .03, W: 0, FW: -.03 })[pos] || 0,
   laneR: (A, pos) => 1.1 + FBX.u(A.hiz) * .3 + FBX.posDef(pos) * 3,
   icpR: (A, pos) => .85 + FBX.u(A.hiz) * .35 + FBX.posDef(pos) * 2,
+  lungeR: (A, pos) => 2 + FBX.u(A.hiz) * .7 + FBX.posDef(pos) * 3,       // how far a tap throws you into a passing lane
   control: A => .62 + FBX.u(A.teknik) * .3,                                 // keeping a cut-out pass instead of deflecting it
   blockR: A => .7 + FBX.u(A.fizik) * .3,
   blockP: A => .6 + FBX.u(A.fizik) * .3,

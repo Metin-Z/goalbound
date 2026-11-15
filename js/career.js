@@ -125,7 +125,10 @@ function Futbol(host) {
     inp.click();
   }
   function save(silent) { if (!C) return true; const ok = FBS.write(slot, C); if (!ok && !silent) toast('⚠️ Kayıt yazılamadı — depolama dolu olabilir'); return ok; }
-  const onVis = () => { if (document.hidden) { save(true); if (match) match.pause(); FBA.suspend(); } else FBA.resume(); };
+  // Copy the running match's progress into the save so a reload/app switch resumes at the right minute.
+  // Only between moments ('tick'): a half-played moment cannot be restored, the next one is generated again.
+  function syncLive() { if (!match || !C || !C.live || match.tut) return; const s = match._st; if (!s.ended && s.mode === 'tick') { Object.assign(C.live, { min: s.min, sc: s.sc.slice(), us: { ...s.us }, rating: s.rating, log: s.log.slice() }); save(true); } }
+  const onVis = () => { if (document.hidden) { syncLive(); save(true); if (match) match.pause(); FBA.suspend(); } else FBA.resume(); };
   document.addEventListener('visibilitychange', onVis);
   window.addEventListener('pagehide', onVis);
   const me = () => C.p, club = () => FBT.team(C.club), lgOf = id => id.split(':')[0];
@@ -516,8 +519,10 @@ function Futbol(host) {
     const p = me(); p.age++;
     if (p.age > 30) { ['hiz', 'fizik'].forEach(k => p.attr[k] = Math.max(30, p.attr[k] - (1 + ((Math.random() * 2) | 0)))); }
     // Transfer offers
-    const val = FBC.ovr(p) + (avg - 6.6) * 9 + my.g * .25 + my.a * .15;
-    const cand = FBT.all().filter(id => id !== C.club && FBT.team(id).r <= val + 6 && FBT.team(id).r >= Math.min(val - 6, club().r - 2));
+    // Value from the season actually played; a season mostly on the bench (few apps) is judged on ability alone,
+    // and then smaller clubs come in offering regular football
+    const benched = my.apps < 8, val = FBC.ovr(p) + (benched ? 0 : (avg - 6.6) * 9) + my.g * .25 + my.a * .15;
+    const cand = FBT.all().filter(id => id !== C.club && FBT.team(id).r <= val + (benched ? 2 : 6) && FBT.team(id).r >= Math.min(val - (benched ? 12 : 6), club().r - 2));
     const offers = [];
     for (let i = 0; i < 12 && offers.length < 3 && cand.length; i++) { const id = FBU.pick(cand); if (!offers.includes(id)) offers.push(id); }
     C.offers = offers.sort((a, b) => FBT.team(b).r - FBT.team(a).r);
@@ -541,7 +546,7 @@ function Futbol(host) {
   const avatar = (p, kit, back, w = 110) => { const cv = document.createElement('canvas'); cv.width = 200; cv.height = 300; cv.style.width = w + 'px'; cv.style.height = w * 1.5 + 'px'; fbAvatar(cv, p.look, kit, p.num, p.short, back); return cv; };
 
   function renderTitle() {
-    let html = `<div class="fb-hero gb-hero"><svg class="gb-pitch" viewBox="0 0 200 120" aria-hidden="true"><path d="M0 119h200M60 119v-38h80v38M82 119v-16h36v16M70 81a30 30 0 0 0 60 0"/><circle cx="100" cy="0" r="26"/><path d="M0 0h200"/></svg><h1 class="gb-word"><span>GOAL</span><em>BOUND</em></h1><p>Oyuncunu yarat, İstediğin ligden başla, Avrupa'yı fethet.</p></div><div class="fb-slots">`;
+    let html = `<div class="fb-hero gb-hero"><svg class="gb-pitch" viewBox="0 0 200 120" aria-hidden="true"><path d="M0 119h200M60 119v-38h80v38M82 119v-16h36v16M70 81a30 30 0 0 0 60 0"/><circle cx="100" cy="0" r="26"/><path d="M0 0h200"/></svg><h1 class="gb-word"><span>GOAL</span><em>BOUND</em></h1><p>Oyuncunu yarat, istediğin ligden başla, Avrupa'yı fethet.</p></div><div class="fb-slots">`;
     for (let n = 0; n < 3; n++) {
       const raw = localStorage.getItem(FBS.key(n)) || localStorage.getItem(FBS.key(n) + '_b'), d = FBS.read(n);
       if (d) {
@@ -602,7 +607,7 @@ function Futbol(host) {
       else if (a === 'club') { d.club = b.dataset.v; d.lg = lgOf(d.club); FBA.play('confirm'); sub.flip = true; }
       else if (a === 'prev') { sub.step--; FBA.play('back'); }
       else if (a === 'next') {
-        if (st === 0) { d.first = d.first.trim(); d.last = d.last.trim(); if (!d.first || !d.last) { toast('Ad ve soyad gir'); FBA.play('back'); return; } d.short = (d.short.trim() || d.last).slice(0, 12); }
+        if (st === 0) { d.first = d.first.trim(); d.last = d.last.trim(); if (!d.first || !d.last) { toast('Ad ve soyad gir'); FBA.play('back'); return; } d.short = (d.short.trim() || d.last).slice(0, 12).replace(/[-\s.']+$/, ''); }   // no dangling hyphen on the shirt
         if (st === 2 && d.pts > 0) { toast(`Önce ${d.pts} puanı dağıt`); FBA.play('back'); return; }
         if (st === 3) { if (!d.club) { toast('Bir kulüp seç'); FBA.play('back'); return; } return createCareer(); }
         sub.step++; FBA.play('confirm');
@@ -642,8 +647,8 @@ function Futbol(host) {
       user: { name: p.first + ' ' + p.last, short: p.short, num: p.num, pos: p.pos, attr: p.attr, look: p.look },
       onEnd(r) {
         wrap.remove(); match = null;
-        if (!r.skipped) { try { localStorage.setItem('od_fb_tut', '1'); } catch (e) {} C.tut = 1; }
-        save(true); if (!r.skipped) toast('🎓 Eğitim tamamlandı'); show('hub');
+        try { localStorage.setItem('od_fb_tut', '1'); } catch (e) {} C.tut = 1;   // skipped counts as seen: it can be replayed from Ayarlar
+        save(true); toast(r.skipped ? 'Eğitim atlandı · Ayarlar\'dan istediğin zaman oynayabilirsin' : '🎓 Eğitim tamamlandı'); show('hub');
       }
     });
     const d0 = match.destroy; match.destroy = () => { d0(); wrap.remove(); };
@@ -949,7 +954,7 @@ function Futbol(host) {
       onEnd(res) { wrap.remove(); match = null; applyResult(f, res); show('post'); }
     });
     // Periodic snapshot (every ~10 match minutes) for crash recovery
-    const iv = setInterval(() => { if (!match || dead) return clearInterval(iv); const s = match._st; if (!s.ended && s.mode === 'play') { Object.assign(C.live, { min: s.min, sc: s.sc.slice(), us: { ...s.us }, rating: s.rating, log: s.log.slice() }); save(true); } }, 6000);
+    const iv = setInterval(() => { if (!match || dead) return clearInterval(iv); syncLive(); }, 6000);
     const d0 = match.destroy; match.destroy = () => { clearInterval(iv); d0(); wrap.remove(); };
   }
   // Post-match booth: invented pundits; lines picked from pools by what really happened
@@ -1024,7 +1029,7 @@ function Futbol(host) {
   show('title');
   const API = {
     pause() { if (match) match.pause(); save(true); },
-    destroy() { dead = true; save(true); if (match) { match.destroy(); match = null; } document.removeEventListener('visibilitychange', onVis); window.removeEventListener('pagehide', onVis); FBA.stopCrowd(); },
+    destroy() { syncLive(); dead = true; save(true); if (match) { match.destroy(); match = null; } document.removeEventListener('visibilitychange', onVis); window.removeEventListener('pagehide', onVis); FBA.stopCrowd(); },
     // test hooks
     get _C() { return C; }, get _match() { return match; }, _show: show, _fns: { nextFix, simUser, applyResult, seasonEnd, startNext }
   };

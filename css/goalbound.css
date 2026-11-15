@@ -288,7 +288,7 @@ button.fb-li:active,.fb-chip:active,.fb-team:active,.fb-hl:active,.fb-king:activ
 /* Tutorial */
 .fbm.tut .fbm-sb,.fbm.tut .fbm-sub{display:none}
 .fbm-tut{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 12px;margin:8px 0 12px;text-align:left}
-.fbm-tut b:first-child{display:block;color:var(--acc,#ffd400);letter-spacing:.06em;font-size:13px;margin-bottom:4px}
+.fbm-tut>b:first-child{display:block;color:var(--acc,#ffd400);letter-spacing:.06em;font-size:13px;margin-bottom:4px}
 .fbm-tut p{margin:0;font-size:14px;line-height:1.45}
 .fbm-tutn{font-size:12px;opacity:.75;margin:0 0 10px}
 
@@ -310,3 +310,14 @@ button.fb-li:active,.fb-chip:active,.fb-team:active,.fb-hl:active,.fb-king:activ
 
 .fb-sel-st{margin:10px 0;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);font-size:13.5px;line-height:1.4}.fb-sel-st small{display:block;opacity:.7;margin-top:3px}.fb-sel-st.on{border-color:rgba(74,222,128,.45)}.fb-sel-st.sub{border-color:rgba(253,224,71,.5)}.fb-sel-st.bench{border-color:rgba(248,113,113,.5)}
 .fb-xib{margin-top:6px;padding-top:6px;border-top:1px dashed rgba(255,255,255,.2);opacity:.85}
+
+/* Narrow phones (≤400px): career creation stacks the avatar above the form so +/- buttons and club lists fit */
+@media (max-width:400px){
+  .fb-cr{flex-direction:column;align-items:stretch;gap:8px}
+  .fb-av{position:static;flex-direction:row;justify-content:center;gap:10px;padding:6px}
+  .fb-av canvas{max-height:96px;width:auto!important}
+}
+/* While a match card (pause/half-time/tutorial) is open, hide the ticker underneath */
+.fbm:has(.fbm-ov:not([hidden])) .fbm-tick{visibility:hidden}
+/* Very narrow screens: keep the header buttons, shorten the title */
+@media (max-width:350px){.fb-title{font-size:15px;letter-spacing:.02em}}

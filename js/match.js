@@ -266,7 +266,12 @@ function FBMatch(host, o) {
       const tx = clamp(spot.x + (i - 1) * 16 + (R() - .5) * 5, 6, 62), ty = clamp(spot.y - 14 - R() * 10, 20, 90);
       p.x = tx; p.y = ty; p.goal = { x: tx + (R() - .5) * 4, y: ty - 6 }; mom.mates.push(p);
     });
-    mom.car = car; mom.str = 0; mom.decT = opt.passAt != null ? opt.passAt : 1 + R() * .8; mom.noShot = !!opt.noShot;
+    mom.car = car; mom.str = 0; mom.decT = opt.passAt != null ? opt.passAt : 1.6 + R() * .8;   // time to take position before the first decision mom.noShot = !!opt.noShot;
+    if (opt.calm && mom.runners[0]) {   // tutorial: a slow carrier, a runner holding his spot, the user a few metres off the lane
+      const r = mom.runners[0]; r.goal = { x: r.x, y: r.y }; mom.calm = true;
+      const mx = (car.x + r.x) / 2, my = (car.y + r.y) / 2, l = Math.hypot(r.x - car.x, r.y - car.y) || 1, nx = -(r.y - car.y) / l, ny = (r.x - car.x) / l, sg = ny > 0 ? 1 : -1;
+      me.x = clamp(mx + nx * sg * 3.5, 2, 66); me.y = clamp(my + ny * sg * 3.5, 2, PL - 2);
+    }
     attach(car); ball.x = car.x; ball.y = car.y + FOOT;
     feed(`🛡️ ${mm()}' ${FBU.esc(o.opp.abbr)} atakta… ${FBU.esc(car.short)} topla <b>${FBU.esc(me.short)}</b> üzerine geliyor`, 'me');
     st.script = [{ k: 'wait', t: .5 }, { k: 'do', fn: beginDuel }];
@@ -277,7 +282,7 @@ function FBMatch(host, o) {
   function beginDuel() {
     const m = mom; m.phase = 'duel'; m.t = 0; st.mode = 'moment'; me.lane = null; m.car.lane = null; ball.own = null; ball.phys = false; m.car.cool = .4;
     $('.fbm-mt').textContent = '🛡️ Atağı durdur!';
-    $('.fbm-hint').innerHTML = `<b>Basılı tut</b>: konum al · <b>dokun</b>: müdahale · <b>hızlı kaydır</b>: kayarak müdahale · kırmızı pas yoluna gir: <b>pas arası</b>`;
+    $('.fbm-hint').innerHTML = `<b>Basılı tut</b>: konum al · <b>dokun</b>: müdahale · <b>hızlı kaydır</b>: kayarak müdahale · pas yolu <b style="color:#fde047">sarı</b> yanınca dokun: <b>pas arası</b>`;
     $('.fbm-bar i').style.width = '100%'; momEl.hidden = false;
     FBA.crowdLevel(.65);
   }
@@ -287,8 +292,21 @@ function FBMatch(host, o) {
     return Math.hypot(me.x - (ax + dx * t), me.y - (ay + dy * t)) < r;
   }
   // Defensive actions: a short poke (tap) or a long slide (flick)
+  // Tap while a pass is being shaped (yellow lane) or travelling: throw yourself into the lane (pas arası).
+  // Reach grows with Hız and position; a lunge that falls short leaves you a step behind.
+  function lungeIntercept() {
+    const m = mom, a = m.fly ? [m.fly.x0, m.fly.y0, m.fly.x1, m.fly.y1] : [ball.x, ball.y, m.wind.r.x, m.wind.r.y];
+    const dx = a[2] - a[0], dy = a[3] - a[1], l2 = dx * dx + dy * dy || 1;
+    let t = clamp(((me.x - a[0]) * dx + (me.y - a[1]) * dy) / l2, 0, 1);
+    if (m.fly) t = Math.max(t, Math.min(1, m.fly.t / m.fly.dur + .1));   // only the part the ball has not passed yet
+    const px = a[0] + dx * t, py = a[1] + dy * t, d = Math.hypot(px - me.x, py - me.y), reach = FBX.lungeR(A, U.pos) + (TUT ? .8 : 0), go = Math.min(d, reach);
+    me.slide = { ang: Math.atan2(py - me.y, px - me.x), t: 0, dur: .26, v: go / .26, lunge: true }; me.face = me.slide.ang; me.kick = .25; m.fing = null;
+    m.lungeD = d - go; FBA.play('kick', .2);
+  }
   function pokeTackle() {
-    const m = mom; if (!m || m.phase !== 'duel' || me.slide || me.stun > 0 || m.fly) return;
+    const m = mom; if (!m || m.phase !== 'duel' || me.slide || me.stun > 0) return;
+    if ((m.fly && m.fly.kind === 'pass') || m.wind) return lungeIntercept();
+    if (m.fly) return;
     const ang = Math.atan2(ball.y - me.y, ball.x - me.x), R0 = FBX.pokeR(A);
     me.slide = { ang, t: 0, dur: .22, v: R0 / .22, poke: true, clean: (m.looseT || 9) < (TUT ? .25 : .15) }; me.face = ang; me.kick = .25; m.fing = null;
   }
@@ -301,9 +319,9 @@ function FBMatch(host, o) {
   function carrierAct(m, kind, r) {
     const c = m.car, sx = ball.x, sy = ball.y;
     if (kind === 'pass') {
-      const T0r = Math.hypot(r.x - sx, r.y - sy) / 15, g = r.goal || r, l = Math.hypot(g.x - r.x, g.y - r.y) || 1, s = Math.min(l, 5 * T0r);
+      const PV = TUT ? 8.5 : 12.5, T0r = Math.hypot(r.x - sx, r.y - sy) / PV, g = r.goal || r, l = Math.hypot(g.x - r.x, g.y - r.y) || 1, s = Math.min(l, 5 * T0r);
       const tx = r.x + (g.x - r.x) / l * s, ty = r.y + (g.y - r.y) / l * s;
-      m.fly = { kind, x0: sx, y0: sy, x1: tx, y1: ty, t: 0, dur: Math.max(.35, Math.hypot(tx - sx, ty - sy) / 15), to: r };
+      m.fly = { kind, x0: sx, y0: sy, x1: tx, y1: ty, t: 0, dur: Math.max(.35, Math.hypot(tx - sx, ty - sy) / PV), to: r, minD: 99 };
       feed(`↗ ${FBU.esc(c.short)} pası ${FBU.esc(r.short)}'e çıkardı`, 'mut'); FBA.play('pass');
     } else {
       const tx = 34 + (R() - .5) * 6, ty = PL + .3;
@@ -312,9 +330,11 @@ function FBMatch(host, o) {
     }
     c.face = Math.atan2(m.fly.y1 - sy, m.fly.x1 - sx); c.kick = .3;
   }
+  // Telegraph before a pass (longer and clearer in the tutorial)
+  function windUp(m, r) { m.wind = { r, t: TUT ? .9 : .5 }; FBA.play('ui'); }
   function duelStep(m, dt) {
     if (m.res) return;
-    const c = m.car, vC = TUT ? 3.4 : 4.3 + (o.opp.r - 70) * .03;
+    const c = m.car, vC = TUT ? (m.calm ? .01 : 3.4) : 4.3 + (o.opp.r - 70) * .03;
     if (c.stun > 0) c.stun -= dt;
     m.runners.forEach(r => { if (!m.fly || m.fly.to !== r) moveTo(r, r.goal.x, r.goal.y, TUT ? 3.6 : 4.6, dt, .4); });
     // ball in flight (pass or shot): the user can cut it out / block it if he is in the lane
@@ -322,6 +342,7 @@ function FBMatch(host, o) {
       const f = m.fly; f.t += dt; const k = Math.min(1, f.t / f.dur);
       ball.x = lerp(f.x0, f.x1, k); ball.y = lerp(f.y0, f.y1, k); ball.z = f.kind === 'shot' ? .4 : 0;
       moveDef(m, dt);
+      if (f.kind === 'pass') f.minD = Math.min(f.minD, Math.hypot(ball.x - me.x, ball.y - me.y));
       if (!f.tested && Math.hypot(ball.x - me.x, ball.y - me.y) < (f.kind === 'shot' ? FBX.blockR(A) : FBX.icpR(A, U.pos) + (TUT ? .5 : 0)) && !(me.stun > 0 && !me.slide)) {
         f.tested = true;
         if (f.kind === 'pass') {
@@ -331,9 +352,17 @@ function FBMatch(host, o) {
         if (R() < FBX.blockP(A)) { FBA.play('tackle'); pop('🧱 Şutu blokladın!', '#86efac'); st.crowdJump = Math.max(st.crowdJump, .9); return endMoment('block'); }
       }
       if (k >= 1) {
-        if (f.kind === 'pass') { attach(f.to); pop('Pas arkadaşına ulaştı', '#fca5a5'); return endMoment('passed'); }
+        if (f.kind === 'pass') { attach(f.to); m.missBy = Math.max(0, f.minD - FBX.icpR(A, U.pos) - (TUT ? .5 : 0)); pop('Pas arkadaşına ulaştı', '#fca5a5'); return endMoment('passed'); }
         pop('Rakip şutunu çekti', '#fca5a5'); m.shotD = f.dist; return endMoment('shotx');
       }
+      return;
+    }
+    // a pass being shaped: he slows, looks up, the lane flashes yellow; then the ball goes
+    if (m.wind) {
+      accelMove(c, c.x, c.y, 0, dt, 6); c.face = Math.atan2(m.wind.r.y - c.y, m.wind.r.x - c.x);
+      ball.x = c.x + Math.cos(c.face) * FOOT; ball.y = c.y + Math.sin(c.face) * FOOT; m.loose = false;
+      if (moveDef(m, dt)) return;
+      if ((m.wind.t -= dt) <= 0) { const r = m.wind.r; m.wind = null; carrierAct(m, 'pass', r); }
       return;
     }
     // carrier: heads for the box, cuts sideways when the defender stands in his way, reads the lanes
@@ -353,10 +382,10 @@ function FBMatch(host, o) {
       if (shotOpen && R() < (pressed ? .45 : .6)) return carrierAct(m, 'shot');
       if (open.length && R() < (pressed ? .55 : .3)) {
         if (pressed && R() < .3 + FBX.posDef(U.pos)) { pop('Baskı işe yaradı!', '#86efac'); return duelWon(m, 'press'); }   // rushed pass under pressure
-        return carrierAct(m, 'pass', open.sort((a, b) => b.y - a.y)[0]);
+        return windUp(m, open.sort((a, b) => b.y - a.y)[0]);
       }
-      if (TUT && TUT.defOpt && TUT.defOpt.passAt != null && m.runners.length) return carrierAct(m, 'pass', m.runners[0]);   // the interception lesson always passes
-      if (misread) return carrierAct(m, 'pass', misread);
+      if (TUT && TUT.defOpt && TUT.defOpt.passAt != null && m.runners.length) return windUp(m, m.runners[0]);   // the interception lesson always passes
+      if (misread) return windUp(m, misread);
     }
     const tx = m.cut ? m.cut.x : m.goalX, ty = m.cut ? c.y + 2.5 : m.goalY;
     accelMove(c, tx, ty, m.cut ? vC * 1.1 : vC, dt, 7);
@@ -379,12 +408,12 @@ function FBMatch(host, o) {
       const sl = me.slide; sl.t += dt;
       me.x = clamp(me.x + Math.cos(sl.ang) * sl.v * dt, 1, 67); me.y = clamp(me.y + Math.sin(sl.ang) * sl.v * dt, 1, 104); me.ph += dt * 3;
       const fx = me.x + Math.cos(sl.ang) * .55, fy = me.y + Math.sin(sl.ang) * .55;
-      if (!m.fly && !sl.hit && Math.hypot(fx - ball.x, fy - ball.y) < (sl.poke ? .65 : FBX.footR(A)) + (TUT ? .25 : 0)) {
+      if (!sl.lunge && !m.fly && !sl.hit && Math.hypot(fx - ball.x, fy - ball.y) < (sl.poke ? .65 : FBX.footR(A)) + (TUT ? .25 : 0)) {
         sl.hit = true;
         if (sl.clean || m.looseT < (TUT ? .3 : .05) || R() < FBX.duel(A, o.opp.r) + FBX.posDef(U.pos)) { duelWon(m, 'tackle'); return true; }   // timing decides; strength settles a 50-50
         pop(sl.poke ? 'Top ayağında kaldı' : 'Rakip sıyrıldı!', '#fca5a5'); c.cool = .2; FBA.play('touch');
-      } else if (!m.fly && !sl.hit && d2(me, c) < .6 && Math.hypot(fx - ball.x, fy - ball.y) > FBX.footR(A) * 1.5 && R() < (sl.poke ? .45 : 1)) { duelFoul(m); return true; }   // took the man, clearly not the ball
-      if (sl.t >= sl.dur) { me.slide = null; me.stun = sl.poke ? (sl.hit ? .45 : .3) : FBX.recover(A); me.vx = me.vy = 0; }
+      } else if (!sl.lunge && !m.fly && !sl.hit && d2(me, c) < .6 && Math.hypot(fx - ball.x, fy - ball.y) > FBX.footR(A) * 1.5 && R() < (sl.poke ? .45 : 1)) { duelFoul(m); return true; }   // took the man, clearly not the ball
+      if (sl.t >= sl.dur) { me.slide = null; me.stun = sl.lunge ? .2 : sl.poke ? (sl.hit ? .45 : .3) : FBX.recover(A); me.vx = me.vy = 0; }
     } else if (me.stun > 0) { me.stun -= dt; }
     else if (m.fing) {
       const wx = (m.fing.x - W / 2) / cam.s + cam.x, wy = (m.fing.y - H / 2) / cam.s + cam.y; m.fw = { x: wx, y: wy };
@@ -824,9 +853,10 @@ function FBMatch(host, o) {
     { type: 'pass', t: '2/5 · PAS', d: 'Koşan bir takım arkadaşını seç. Ona göndermek için <b>ters yöne çek ve bırak</b>. Kısa çekiş yumuşak pas, uzun çekiş sert pas demek.', ok: r => r === 'pass' || r === 'assist', why: { passfail: 'Pas arkadaşına ulaşmadı. Koştuğu yerin biraz önüne at.', saved: 'Bu ders pas dersi: kaleye değil arkadaşına gönder.', wide: 'Bu ders pas dersi: kaleye değil arkadaşına gönder.', goal: 'Gol güzel ama bu ders pas dersi!' } },
     { type: 'drive', t: '3/5 · TOP SÜRME', d: 'Parmağını sahada <b>basılı tut</b>: oyuncun parmağına doğru koşar, top ayağında kalır. Rakiplerden uzak durarak sarı <b>HEDEF</b> bölgesine ulaş.', ok: r => r === 'drive', why: { lost: 'Top kaptırıldı. Rakiplerin etrafından dolaş, üstlerine sürme.' } },
     { type: 'def', opt: { runners: 0 }, t: '4/5 · MÜDAHALE', d: 'Rakip topla üstüne geliyor. <b>Basılı tutarak</b> önüne geç. Top ayağından açılınca halka <b style="color:#4ade80">yeşil</b> olur: o an <b>ekrana dokun</b> (kısa müdahale) ya da topa doğru <b>hızlıca kaydır</b> (kayarak müdahale, daha uzun erişim ama daha riskli). Topa değil adama girersen faul olur.', ok: r => r === 'tackle', why: { foul: 'Faul! Topa değil rakibe girdin. Halkanın yeşil olmasını bekle.', beaten: 'Rakip geçti. Önce önüne geç, sonra müdahale et.' } },
-    { type: 'def', opt: { runners: 1, passAt: 1.8, noShot: true }, t: '5/5 · PAS ARASI', d: 'Rakip, koşan arkadaşına pas atmak istiyor. <b style="color:#f87171">Kırmızı kesikli çizgi</b> açık pas yolu. Basılı tutup <b>bu yolun üstüne gir</b>: pas sana çarparsa top senin. Doğru yerde durmak (pozisyon almak) her şeydir.', ok: r => r === 'intercept' || r === 'tackle', why: { passed: 'Pas arkadaşına ulaştı. Çizginin tam üstünde dur.', deflect: 'Topa dokundun ama kontrol edemedin. Bir daha!', beaten: 'Rakip geçti. Pas yolunu kapatırken ona da yakın kal.' } }
+    { type: 'def', opt: { runners: 1, passAt: 2.4, noShot: true, calm: true }, t: '5/5 · PAS ARASI', d: 'Rakip, koşan arkadaşına pas atacak. <b style="color:#f87171">Kırmızı kesikli çizgi</b> pas yolu. Pas atılmadan hemen önce çizgi <b style="color:#fde047">sarı yanıp söner</b>. İki yol var: basılı tutup <b>çizginin üstüne geç</b>, ya da sarı yanınca <b>ekrana dokun</b>, oyuncun pasın önüne atılsın. Top sana çarparsa senin.', ok: r => r === 'intercept' || r === 'tackle', why: { passed: 'Pas arkadaşına ulaştı. Çizginin üstüne geç ya da sarı yanınca dokun.', deflect: 'Topa dokundun ama kontrol edemedin. Bir daha!', beaten: 'Rakip geçti. Pas yolunu kapatırken ona da yakın kal.' } }
   ];
-  function tutCard(head, step, btn) { st.mode = 'tut'; showCard(`<div class="fbm-h">${head}</div>${step ? `<div class="fbm-tut"><b>${step.t}</b><p>${step.d}</p></div>` : ''}${btn}`); }
+  // Every lesson card offers a way out (the pause button is under the card), except the final one
+  function tutCard(head, step, btn) { st.mode = 'tut'; showCard(`<div class="fbm-h">${head}</div>${step ? `<div class="fbm-tut"><b>${step.t}</b><p>${step.d}</p></div>` : ''}${btn}${step ? '<button class="fbm-btn ghost" data-a="tskip">Eğitimi atla</button>' : ''}`); }
   function tutStart() { const s = TUT_STEPS[TUT.i]; ovEl.hidden = true; TUT.defOpt = s.opt || null; st.us = { g: 0, a: 0, sh: 0, sot: 0, pk: 0, pf: 0, dr: 0, lost: 0, miss: 0, wide: 0, blk: 0, post: 0 }; enterScene(s.type); if (s.type !== 'def') mom.defs = s.type === 'drive' ? mom.defs.slice(0, 2) : []; if (s.type === 'box') GK1.sk = .15; }
   function tutAfter(res) {
     const s = TUT_STEPS[TUT.i];
@@ -836,10 +866,15 @@ function FBMatch(host, o) {
       return tutCard('✅ Harika!', TUT_STEPS[TUT.i], `<button class="fbm-btn pri" data-a="tgo">Devam ▶</button>`);
     }
     FBA.play('back');
+    if (res === 'passed' && lastMiss != null) {   // say how far off the lane the player was
+      const why = lastMiss < 1.5 ? `Çok yaklaştın (${lastMiss.toFixed(1)} m)! Sarı çizgi yanınca <b>ekrana dokun</b>: oyuncun topa atılır.` : `Pas yolundan ${lastMiss.toFixed(1)} m uzaktaydın. Basılı tutup <b>çizginin üstüne</b> geç, pas gelince dokun.`;
+      return tutCard('Tekrar dene', { t: s.t, d: `<i>${why}</i><br><br>${s.d}` }, `<button class="fbm-btn pri" data-a="tgo">Tekrar dene ↻</button>`);
+    }
     tutCard('Tekrar dene', { t: s.t, d: `<i>${(s.why && s.why[res]) || 'Bir daha dene, olacak!'}</i><br><br>${s.d}` }, `<button class="fbm-btn pri" data-a="tgo">Tekrar dene ↻</button>`);
   }
+  let lastMiss = null;
   function toTicker() {
-    if (TUT) { const r = mom && mom.res; mom = null; momEl.hidden = true; shotEl.hidden = true; c3.tk = c3.k = 0; me.keep = false; st.kickT = null; st.script = null; resetActors(); ball.phys = false; ball.fl = null; return tutAfter(r); }
+    if (TUT) { const r = mom && mom.res; lastMiss = mom && mom.missBy != null ? mom.missBy : null; mom = null; momEl.hidden = true; shotEl.hidden = true; c3.tk = c3.k = 0; me.keep = false; st.kickT = null; st.script = null; resetActors(); ball.phys = false; ball.fl = null; return tutAfter(r); }
     mom = null; momEl.hidden = true; shotEl.hidden = true; c3.tk = c3.k = 0; me.keep = false; st.kickT = null; st.script = null; st.mode = 'tick'; st.hold = .35; resetActors(); ball.phys = false; ball.fl = null;
     if (!ball.own) attach(GK1);
     showTicker(true); FBA.crowdLevel(.25);
@@ -970,7 +1005,11 @@ function FBMatch(host, o) {
   // a ring on the ball that turns green while it is away from his feet, and your poke / slide reach
   function drawDuel() {
     const m = mom, [bx, by] = W2S(ball.x, ball.y), [mx, my] = W2S(me.x, me.y), s = cam.s, ok = m.loose && !m.fly, laneR = FBX.laneR(A, U.pos);
-    if (!m.fly) {
+    if (m.wind) {   // the pass is coming: flashing yellow lane + label
+      const [rx, ry] = W2S(m.wind.r.x, m.wind.r.y), on = (perf * 8 | 0) % 2;
+      cx.strokeStyle = on ? '#fde047' : 'rgba(253,224,71,.55)'; cx.lineWidth = 6; cx.beginPath(); cx.moveTo(bx, by); cx.lineTo(rx, ry); cx.stroke();
+      label('PAS GELİYOR · DOKUN!', (bx + rx) / 2, (by + ry) / 2 - 14, '#fde047');
+    } else if (!m.fly) {
       m.runners.forEach(r => { const cov = laneCovered(ball.x, ball.y, r.x, r.y, laneR), [rx, ry] = W2S(r.x, r.y); cx.strokeStyle = cov ? 'rgba(255,255,255,.25)' : 'rgba(248,113,113,.8)'; cx.lineWidth = cov ? 2 : 3; cx.setLineDash([7, 7]); cx.beginPath(); cx.moveTo(bx, by); cx.lineTo(rx, ry); cx.stroke(); cx.setLineDash([]); });
       if (m.car.y > PL - 22 && !m.noShot) { const cov = laneCovered(ball.x, ball.y, 34, PL, laneR), [gx2, gy2] = W2S(34, PL); cx.fillStyle = cov ? 'rgba(255,255,255,.06)' : 'rgba(248,113,113,.14)'; cx.beginPath(); cx.moveTo(bx, by); cx.lineTo(gx2 - 3.66 * s, gy2); cx.lineTo(gx2 + 3.66 * s, gy2); cx.closePath(); cx.fill(); }
     }
@@ -1219,7 +1258,7 @@ function FBMatch(host, o) {
     else if (a === 'res') { ovEl.hidden = true; st.paused = false; FBA.resume(); }
     else if (a === 'sim') { ovEl.hidden = true; st.paused = false; simRest(); }
     else if (a === 'tgo') tutStart();
-    else if (a === 'tdone' || a === 'tskip') { ovEl.hidden = true; if (!dead) { destroy(); o.onEnd({ tut: true, skipped: a === 'tskip' }); } }
+    else if (a === 'tdone' || a === 'tskip') { ovEl.hidden = true; if (!dead) { destroy(); o.onEnd({ tut: true, skipped: a === 'tskip' }); } }   // skipping also counts as seen (replay from Ayarlar)
   });
   card.addEventListener('input', e => { const k = e.target.dataset.v; if (k) FBA.setVol(k, e.target.type === 'checkbox' ? +e.target.checked : e.target.value / 100); if (e.target.dataset.z) { zoom.t = e.target.value / 100; o.onZoom && o.onZoom(zoom.t); } });
   $('.fbm-pause').onclick = () => {
