@@ -26,7 +26,11 @@ const FBC = {
   // Resolve one user moment without playing it (used for simulated matches)
   simMoment(type, A) {
     const r = Math.random, us = { sh: 0, sot: 0, pk: 0, pf: 0, dr: 0, lost: 0, miss: 0, wide: 0, blk: 0, post: 0 }, out = { us, goal: false, assist: false };
-    if (type === 'def') { if (r() < .5 + A.pas / 250) { us.pk++; } else { us.pf++; if (r() < .35) { us.err = (us.err || 0) + 1; out.conceded = true; } } return out; }
+    if (type === 'def') {   // duel first (hız/fizik/teknik), then the pass forward (pas)
+      if (r() > .38 + A.fizik / 400 + A.hiz / 800 + A.teknik / 800) { if (r() < .25) { us.fl = (us.fl || 0) + 1; if (r() < .14) out.conceded = true; } else { us.dl = (us.dl || 0) + 1; if (r() < .3) { us.err = (us.err || 0) + 1; out.conceded = true; } } return out; }
+      us.tk = (us.tk || 0) + 1;
+      if (r() < .5 + A.pas / 250) { us.pk++; } else { us.pf++; if (r() < .35) { us.err = (us.err || 0) + 1; out.conceded = true; } } return out;
+    }
     if (r() < .35) us.dr++;
     if (type !== 'pen' && type !== 'fk' && r() < .2 * (1.3 - A.teknik / 100)) { us.lost++; return out; }
     if (type === 'drive') { us.dr++; if (r() < .45 * (1.25 - (A.hiz + A.teknik) / 200)) { us.lost++; return out; } us.dr += 1; type = r() < .55 ? 'edge' : 'wing'; }
@@ -584,7 +588,25 @@ function Futbol(host) {
     FBT.seed = C.created;
     newSeason(2026);
     news(`✍️ ${d.first} ${d.last}, ${club().name} ile ilk profesyonel sözleşmesini imzaladı! Forma: ${d.num} · ${FBU.trU(d.short)}`);
-    if (!save()) toast('⚠️ Kayıt oluşturulamadı'); FBA.play('sign'); tab = 'ana'; show('hub');
+    if (!save()) toast('⚠️ Kayıt oluşturulamadı'); FBA.play('sign'); tab = 'ana';
+    if (tutDone()) show('hub'); else startTutorial();
+  }
+  // Tutorial: shown once (flag kept per device and in the career save); can be replayed from Ayarlar
+  const tutDone = () => { try { return localStorage.getItem('od_fb_tut') === '1'; } catch (e) { return false; } };
+  function startTutorial() {
+    view = 'match'; top.hidden = true; nav.hidden = true; main.innerHTML = ''; main.onclick = null;
+    const wrap = document.createElement('div'); wrap.className = 'fb-mw'; root.appendChild(wrap);
+    const p = me(), ids = FBT.ids(C.s.lg).filter(id => id !== C.club);
+    match = FBMatch(wrap, {
+      tut: true, my: club(), opp: FBT.team(ids[ids.length - 1]), home: true, comp: 'Antrenman', len: C.set.len, zoom: C.set.zoom || 1, onZoom(z) { C.set.zoom = Math.round(z * 100) / 100; },
+      user: { name: p.first + ' ' + p.last, short: p.short, num: p.num, pos: p.pos, attr: p.attr, look: p.look },
+      onEnd(r) {
+        wrap.remove(); match = null;
+        if (!r.skipped) { try { localStorage.setItem('od_fb_tut', '1'); } catch (e) {} C.tut = 1; }
+        save(true); if (!r.skipped) toast('🎓 Eğitim tamamlandı'); show('hub');
+      }
+    });
+    const d0 = match.destroy; match.destroy = () => { d0(); wrap.remove(); };
   }
 
   /* ---------- Hub ---------- */
@@ -643,6 +665,7 @@ function Futbol(host) {
     else if (a === 'len') { C.set.len = +b.dataset.v; FBA.play('ui'); save(true); renderHub(); }
     else if (a === 'save') { if (save()) { FBA.play('confirm'); toast('✅ Kaydedildi'); } }
     else if (a === 'exp') exportSave();
+    else if (a === 'tut') { FBA.play('confirm'); startTutorial(); }
     else if (a === 'imp') { if (b.dataset.sure) importSave(slot); else { FBA.play('ui'); b.dataset.sure = 1; b.textContent = 'Üzerine yazılsın mı? Tekrar dokun'; b.classList.add('warn'); setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = '⬆️ İçe aktar'; b.classList.remove('warn'); } }, 4000); } }
     else if (a === 'slots') { save(); FBA.play('back'); show('title'); }
     else if (a === 'menu') { save(); goMenu(); }
@@ -779,6 +802,7 @@ function Futbol(host) {
       <div class="fb-row"><button class="fb-btn pri" data-a="save">💾 Şimdi kaydet</button><button class="fb-btn ghost" data-a="slots">Kariyer seçimi</button>${window.goMenu ? '<button class="fb-btn ghost" data-a="menu">Ana menü</button>' : ''}</div>
       <h4>Kayıt yedeği (JSON)</h4><p class="fb-mut">Kariyerini dosya olarak indir; başka bir cihaza, tarayıcıya veya oyunun yüklü (PWA) sürümüne taşı. İçe aktarma bu kayıt yuvasındaki kariyerin üzerine yazar.</p>
       <div class="fb-row"><button class="fb-btn ghost" data-a="exp">⬇️ Dışa aktar</button><button class="fb-btn ghost" data-a="imp">⬆️ İçe aktar</button></div>
+      <h4>Eğitim</h4><p class="fb-mut">Şut, pas, top sürme ve savunma derslerini istediğin zaman tekrar oynayabilirsin.</p><div class="fb-row"><button class="fb-btn ghost" data-a="tut">🎓 Eğitimi tekrar oyna</button></div>
       <p class="fb-note">Kulüp ve lig isimleri gerçektir; oyuncu isimleri ülkelere göre üretilir. Veriler fb_data bölümünden kolayca güncellenebilir.</p>`;
   }
   // Collapse repeated awards (e.g. several player-of-the-month titles) into one card with a count

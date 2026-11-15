@@ -13,6 +13,7 @@ const FBU = {
   rate(u, gf, ga) {
     const n = k => u[k] || 0;
     const r = 6.2 + n('g') * 1 + n('a') * .7 + n('pk') * .12 + n('sot') * .12 + n('dr') * .06 + n('post') * .05
+      + n('tk') * .2 - n('dl') * .15 - n('fl') * .2
       - n('pf') * .22 - n('lost') * .25 - n('err') * .35 - n('miss') * .15 - n('wide') * .08 - n('blk') * .08 + FBU.clamp((gf - ga) * .12, -.4, .4);
     return Math.round(FBU.clamp(r, 3, 10) * 10) / 10;
   },
@@ -93,6 +94,18 @@ const FBT = {
     });
     return map;
   }
+};
+
+/* ---------- Attribute → match effect formulas (one place, so balance is easy to tune) ----------
+   Each attribute (0-99) drives its own mechanics; values ~50 are playable, 90+ clearly better, never automatic. */
+const FBX = {
+  // Defending duel: running speed while jockeying (hız), slide speed (hız), slide length & tackle strength & recovery (fizik), clean-contact reach (teknik)
+  run: A => 4.6 + A.hiz / 100 * 2.6,
+  slideV: A => 7 + A.hiz / 100 * 1.5,
+  slideT: A => .36 + A.fizik / 100 * .14,
+  footR: A => .75 + A.teknik / 100 * .25,
+  duel: (A, oppR) => FBU.clamp(.3 + (A.fizik - oppR) / 120, .12, .6),
+  recover: A => .95 - A.fizik / 100 * .45
 };
 
 /* ---------- Central audio (all synthesized; per-sound cooldowns; 3 volume buses) ---------- */
