@@ -1,11 +1,24 @@
 /* ===================== GOALBOUND — standalone shell: fullscreen, effects, mounting ===================== */
 'use strict';
+// Real visible height (iOS Safari toolbars, address bar, rotation): kept in --app-h for the host
+const STANDALONE = !!(navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches));
+if (STANDALONE) document.documentElement.classList.add('standalone');
+function fitApp() { const h = (window.visualViewport && visualViewport.height) || window.innerHeight; document.documentElement.style.setProperty('--app-h', Math.round(h) + 'px'); }
+fitApp(); addEventListener('resize', fitApp); addEventListener('orientationchange', () => { fitApp(); setTimeout(fitApp, 350); });
+if (window.visualViewport) visualViewport.addEventListener('resize', fitApp);
+// iPhone Safari has no Fullscreen API for pages: explain the closest thing (Add to Home Screen opens it full screen)
+function iosTip() {
+  if (document.querySelector('.ios-tip')) return;
+  const d = document.createElement('div'); d.className = 'ios-tip';
+  d.innerHTML = 'iPhone Safari sayfaların tam ekran açılmasına izin vermiyor. Tam ekran için: <b>Paylaş ⬆️ → Ana Ekrana Ekle</b>, sonra oyunu ana ekrandaki GOALBOUND simgesinden aç.<button>Tamam</button>';
+  d.querySelector('button').onclick = () => d.remove(); document.body.appendChild(d);
+}
 // Toggle browser fullscreen (silently ignored where the browser blocks it)
 function fsToggle() {
   const d = document, el = d.documentElement;
   try {
     if (d.fullscreenElement || d.webkitFullscreenElement) { (d.exitFullscreen || d.webkitExitFullscreen).call(d); return; }
-    const req = el.requestFullscreen || el.webkitRequestFullscreen; if (!req) return;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen; if (!req) { if (!STANDALONE) iosTip(); return; }
     const p = req.call(el, { navigationUI: 'hide' }); if (p && p.catch) p.catch(() => {});
   } catch (e) {}
 }

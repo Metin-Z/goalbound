@@ -4,7 +4,7 @@ const FBC = {
   ROLE_OF: { FW: 'ST', W: 'RW', AM: 'RCM', CM: 'CM', DF: 'RCB' },
   ATTR: [['sut', 'Şut'], ['pas', 'Pas'], ['hiz', 'Hız'], ['teknik', 'Teknik'], ['fizik', 'Fizik']],
   // What each attribute changes in a match (formulas: FBX in core.js)
-  ATTR_FX: { sut: 'Şut isabeti ve bitiricilik', pas: 'Pas isabeti, uzun paslarda hata payı, asist kalitesi', hiz: 'Koşu ve top sürme hızı, kayma hızı', teknik: 'Top kontrolü, dönüş, falso, zor açı', fizik: 'Vuruş gücü, ikili mücadele, kayarak müdahale' },
+  ATTR_FX: { sut: 'Şut isabeti ve bitiricilik', pas: 'Pas isabeti, uzun paslarda hata payı, asist kalitesi', hiz: 'Koşu ve top sürme hızı, pas yolunu kapatma ve araya girme erişimi', teknik: 'Top kontrolü, dönüş, falso, müdahale erişimi, kesilen pası kontrol', fizik: 'Vuruş gücü, ikili mücadele, kayma mesafesi, şut bloklama' },
   W: { DF: { fizik: .3, pas: .25, hiz: .2, teknik: .15, sut: .1 }, FW: { sut: .35, hiz: .2, teknik: .2, fizik: .15, pas: .1 }, W: { hiz: .3, teknik: .25, sut: .2, pas: .15, fizik: .1 }, AM: { pas: .3, teknik: .3, sut: .2, hiz: .1, fizik: .1 }, CM: { pas: .35, fizik: .2, teknik: .2, sut: .15, hiz: .1 } },
   STAGES: ['Son 16', 'Çeyrek final', 'Yarı final', 'Final'],
   ovr(p) { const w = FBC.W[p.pos]; return Math.round(Object.keys(w).reduce((s, k) => s + p.attr[k] * w[k], 0)); },
@@ -26,11 +26,14 @@ const FBC = {
   // Add (or remove) skill points; each threshold passed gives rights, the remainder carries over to the next, larger threshold
   addSkill(p, delta) { p.skill = Math.max(0, (p.skill || 0) + delta); p.lvl = p.lvl || 0; let g = 0; while (p.skill >= FBC.need(p.lvl)) { p.skill -= FBC.need(p.lvl); p.lvl++; p.up += FBC.SK_RIGHTS; g += FBC.SK_RIGHTS; } return g; },
   // Resolve one user moment without playing it (used for simulated matches)
-  simMoment(type, A) {
+  simMoment(type, A, pos) {
+    type = { long: 'edge', own: 'pass', late: 'box', oneone: 'drive' }[type] || type;   // newer kinds resolve like their base kind
     const r = Math.random, us = { sh: 0, sot: 0, pk: 0, pf: 0, dr: 0, lost: 0, miss: 0, wide: 0, blk: 0, post: 0 }, out = { us, goal: false, assist: false };
     if (type === 'def') {   // duel first (hız/fizik/teknik), then the pass forward (pas)
-      if (r() > .38 + A.fizik / 400 + A.hiz / 800 + A.teknik / 800) { if (r() < .25) { us.fl = (us.fl || 0) + 1; if (r() < .14) out.conceded = true; } else { us.dl = (us.dl || 0) + 1; if (r() < .3) { us.err = (us.err || 0) + 1; out.conceded = true; } } return out; }
-      us.tk = (us.tk || 0) + 1;
+      const w = .38 + A.fizik / 400 + A.hiz / 800 + A.teknik / 800 + FBX.posDef(pos || 'CM'), x = r();
+      if (x > w && x < w + .1) { us.bl = (us.bl || 0) + 1; return out; }   // blocked / cleared: danger over
+      if (x > w) { if (r() < .25) { us.fl = (us.fl || 0) + 1; if (r() < .14) out.conceded = true; } else { us.dl = (us.dl || 0) + 1; if (r() < .3) { us.err = (us.err || 0) + 1; out.conceded = true; } } return out; }
+      if (r() < .35) us.ic = (us.ic || 0) + 1; else us.tk = (us.tk || 0) + 1;
       if (r() < .5 + A.pas / 250) { us.pk++; } else { us.pf++; if (r() < .35) { us.err = (us.err || 0) + 1; out.conceded = true; } } return out;
     }
     if (r() < .35) us.dr++;
@@ -67,8 +70,8 @@ const FBC = {
     return R.concat(R.map(m => m.map(([x, y]) => [y, x])));
   },
   simScore(rh, ra, neutral) {
-    const d = (rh - ra) / 2, hb = neutral ? 1 : 1.1, ab = neutral ? 1 : .9;
-    return [FBU.poisson(1.3 * Math.pow(1.075, d) * hb), FBU.poisson(1.3 * Math.pow(1.075, -d) * ab)];
+    const [lh, la] = FBX.lam(rh, ra, neutral ? 0 : 1);
+    return [FBU.poisson(lh), FBU.poisson(la)];
   },
   newTab: n => [...Array(n)].map(() => [0, 0, 0, 0, 0, 0]),
   addRes(tab, h, a, gh, ga) { const H = tab[h], A = tab[a]; H[0]++; A[0]++; H[4] += gh; H[5] += ga; A[4] += ga; A[5] += gh; if (gh > ga) { H[1]++; A[3]++; } else if (gh < ga) { A[1]++; H[3]++; } else { H[2]++; A[2]++; } },
@@ -208,21 +211,22 @@ function Futbol(host) {
   // Whole (or remaining part of a) match without playing: the same moment outcomes and rating formula as a played match
   function simUser(f, frac = 1, base) {
     const t = club(), o = FBT.team(f.opp), p = me(), sq = FBT.squad(C.club).filter(x => ['ST', 'LW', 'RW', 'CM', 'LCM', 'RCM'].includes(x.role) && x.role !== FBC.ROLE_OF[p.pos]), osq = FBT.squad(f.opp).filter(x => x.role !== 'GK');
-    const raw = f.home ? FBC.simScore(t.r, o.r, f.neutral) : FBC.simScore(o.r, t.r, f.neutral).reverse();
+    // same model as a played match: the user's own chances are part of the team's expected goals
+    const [lM, lO] = FBX.lam(t.r, o.r, f.neutral ? 0 : f.home ? 1 : -1), raw = [FBU.poisson(Math.max(.12, lM - FB_ATTN[p.pos] * .16)), FBU.poisson(Math.max(.12, lO - FB_DEFN[p.pos] * .06))];
     const us = Object.assign({ g: 0, a: 0, sh: 0, sot: 0, pk: 0, pf: 0, dr: 0, lost: 0, miss: 0, wide: 0, blk: 0, post: 0, err: 0 }, base ? base.us : {});
     const sc = base ? base.sc.slice() : [0, 0], log = base ? base.log.slice() : [], m0 = base ? base.min : 0, mt = () => Math.floor(m0 + Math.random() * (90 - m0)) + 1;
-    const keep = n => { let k = 0; for (let i = 0; i < n; i++) if (Math.random() < .7 * frac) k++; return k; };
+    const keep = n => { let k = 0; for (let i = 0; i < n; i++) if (Math.random() < frac) k++; return k; };
     const ast = (pool, sc2) => Math.random() < .72 ? FBU.pick(pool.filter(x => x !== sc2)) : null;
     for (let i = keep(raw[0]); i > 0; i--) { sc[0]++; const s2 = FBU.pick(sq), a2 = ast(sq, s2); log.push({ m: mt(), side: 0, name: s2.short, r: s2.role, a: a2 && a2.short, ar: a2 && a2.role }); }
     for (let i = 0; i < raw[1]; i++) if (Math.random() < frac) { sc[1]++; const s2 = FBU.pick(osq), a2 = ast(osq, s2); log.push({ m: mt(), side: 1, name: s2.short, r: s2.role, a: a2 && a2.short, ar: a2 && a2.role }); }
-    const n = Math.round((4 + Math.random() * 1.5) * frac);
+    const n = Math.round((FB_ATTN[p.pos] - 1 + Math.random() * 1.5) * frac);
     for (let i = 0; i < n; i++) {
-      const r = FBC.simMoment(Math.random() < .06 ? 'pen' : FBU.pick(MIX[p.pos]), p.attr); Object.keys(r.us).forEach(k => us[k] += r.us[k]);
+      const r = FBC.simMoment(FBX.pickScene(p.pos, { dr: t.r - o.r, diff: sc[0] - sc[1], min: 20 + i * 15 }), p.attr, p.pos); Object.keys(r.us).forEach(k => us[k] += r.us[k]);
       if (r.goal) { us.g++; sc[0]++; log.push({ m: mt(), side: 0, name: p.short, user: true }); }
       if (r.assist) { us.a++; sc[0]++; const s2 = FBU.pick(sq); log.push({ m: mt(), side: 0, name: s2.short, r: s2.role, a: p.short, ar: 'ME' }); }
     }
-    const nd = Math.round((FB_DEFN[p.pos] * .6 + Math.random() * .6) * frac);
-    for (let i = 0; i < nd; i++) { const r = FBC.simMoment('def', p.attr); Object.keys(r.us).forEach(k => us[k] = (us[k] || 0) + r.us[k]); if (r.conceded) { sc[1]++; const s2 = FBU.pick(osq); log.push({ m: mt(), side: 1, name: s2.short, r: s2.role }); } }
+    const nd = Math.round((FB_DEFN[p.pos] * .6 + Math.random() * .6) * frac * FBU.clamp(1 - (t.r - o.r) * .025, .6, 1.5));
+    for (let i = 0; i < nd; i++) { const r = FBC.simMoment('def', p.attr, p.pos); Object.keys(r.us).forEach(k => us[k] = (us[k] || 0) + r.us[k]); if (r.conceded) { sc[1]++; const s2 = FBU.pick(osq); log.push({ m: mt(), side: 1, name: s2.short, r: s2.role }); } }
     log.sort((a, b) => a.m - b.m);
     us.r = FBU.rate(us, sc[0], sc[1]);
     return { sc, us, log, sim: true };

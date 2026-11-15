@@ -13,7 +13,7 @@ const FBU = {
   rate(u, gf, ga) {
     const n = k => u[k] || 0;
     const r = 6.2 + n('g') * 1 + n('a') * .7 + n('pk') * .12 + n('sot') * .12 + n('dr') * .06 + n('post') * .05
-      + n('tk') * .2 - n('dl') * .15 - n('fl') * .2
+      + n('tk') * .2 + n('ic') * .2 + n('bl') * .12 - n('dl') * .15 - n('fl') * .2
       - n('pf') * .22 - n('lost') * .25 - n('err') * .35 - n('miss') * .15 - n('wide') * .08 - n('blk') * .08 + FBU.clamp((gf - ga) * .12, -.4, .4);
     return Math.round(FBU.clamp(r, 3, 10) * 10) / 10;
   },
@@ -130,12 +130,15 @@ const FBX = {
   // ---- kicking ----
   vmax: A => 25 + FBX.u(A.fizik) * 9,                                       // m/s at full power
   // direction scatter, 1 standard deviation in degrees
-  shotSig: (A, pw) => (.6 + 3.4 * Math.pow(1 - FBX.u(A.sut), 1.3)) * (.7 + .6 * pw),
+  shotSig: (A, pw) => (.8 + 4.2 * Math.pow(1 - FBX.u(A.sut), 1.3)) * (.7 + .6 * pw),
+  // how many metres of the flight the aim guide shows: accuracy attribute sets the base, chosen power stretches it
+  aimReach: (A, pw, shot) => (5 + 20 * Math.pow(FBX.u(shot ? A.sut : A.pas), 1.1)) * (.45 + .55 * pw),
   passSig: (A, pw) => (.5 + 3 * Math.pow(1 - FBX.u(A.pas), 1.3)) * (.6 + .9 * pw * pw),
   contactSig: (A, r2) => r2 * 2.5 * (1.15 - FBX.u(A.teknik)),               // off-centre (curled/chipped) contact
   angleSig: (A, tight) => Math.max(0, tight - .5) * 3 * (1.1 - FBX.u(A.teknik)),   // tight angle to the goal (radians beyond ~30°)
   elevSig: (A, pw) => (.4 + 1.6 * pw) * (1.25 - FBX.u(A.teknik)) * .6,
-  curl: A => .55 + FBX.u(A.teknik) * .45,                                   // spin from off-centre contact
+  curl: A => .55 + FBX.u(A.teknik) * .45,
+  dip: A => .35 + FBX.u(A.teknik) * .6,                                   // free-kick topspin: brings a ball lifted over the wall back down under the bar                                   // spin from off-centre contact
   finish: (A, curled) => ((curled ? A.teknik : A.sut) - 60) / 100 * .4,     // lowers the keeper's save chance
   // ---- carrying the ball ----
   pace: A => 4.4 + FBX.u(A.hiz) * 3.4,                                      // dribbling speed
@@ -150,6 +153,36 @@ const FBX = {
   footR: A => .75 + FBX.u(A.teknik) * .25,
   duel: (A, oppR) => FBU.clamp(.3 + ((A.fizik || 50) - oppR) / 120, .12, .6),
   recover: A => .95 - FBX.u(A.fizik) * .45,
+  pokeR: A => .9 + FBX.u(A.teknik) * .5,                                    // standing poke length (m)
+  // positional defending: how wide a lane the user covers / how far he reaches into a pass or shot; defenders read it best
+  posDef: pos => ({ DF: .12, CM: .08, AM: .03, W: 0, FW: -.03 })[pos] || 0,
+  laneR: (A, pos) => 1.1 + FBX.u(A.hiz) * .3 + FBX.posDef(pos) * 3,
+  icpR: (A, pos) => .85 + FBX.u(A.hiz) * .35 + FBX.posDef(pos) * 2,
+  control: A => .62 + FBX.u(A.teknik) * .3,                                 // keeping a cut-out pass instead of deflecting it
+  blockR: A => .7 + FBX.u(A.fizik) * .3,
+  blockP: A => .6 + FBX.u(A.fizik) * .3,
+  // ---- team scoring model (shared by played and simulated matches) ----
+  // Expected goals for two sides from their strength gap; a shared "match tempo" factor and a small per-side form
+  // factor keep scores varied (tight 1-0s, the odd 4-3) and let underdogs win sometimes. Avg ~2.6 goals per match.
+  lam(rA, rB, venue) {   // venue: 1 = A at home, -1 = A away, 0 = neutral
+    const d = rA - rB, hA = venue > 0 ? 1.1 : venue < 0 ? .9 : 1, hB = venue > 0 ? .9 : venue < 0 ? 1.1 : 1;
+    const tempo = Math.exp(FBX.n() * .15), fA = Math.exp(FBX.n() * .13), fB = Math.exp(FBX.n() * .13);
+    return [1.25 * Math.exp(.022 * d) * hA * tempo * fA, 1.25 * Math.exp(-.022 * d) * hB * tempo * fB].map(x => FBU.clamp(x, .15, 3.6));
+  },
+  // ---- which moment reaches the user ----
+  // ctx: { dr: our strength - theirs, diff: our goals - theirs, min }
+  pickScene(pos, ctx = {}) {
+    if (Math.random() < .06) return 'pen';
+    const w = Object.assign({}, FB_SCEN[pos] || FB_SCEN.CM), dr = ctx.dr || 0, late = (ctx.min || 0) > 68, diff = ctx.diff || 0;
+    const mul = (keys, f) => keys.forEach(k => { if (w[k]) w[k] *= f; });
+    // stronger side: more chances in and around the box; weaker side: more counters
+    mul(['box', 'thru', 'late'], FBU.clamp(1 + dr * .02, .6, 1.5)); mul(['counter', 'own'], FBU.clamp(1 - dr * .025, .5, 1.8));
+    if (late && diff < 0) { mul(['box', 'edge', 'wing', 'long', 'late'], 1.5); mul(['pass', 'own'], .6); }   // chasing the game
+    if (late && diff > 0) { mul(['counter'], 1.8); mul(['pass'], 1.2); mul(['box'], .8); }   // protecting a lead
+    let r = Math.random() * Object.values(w).reduce((a, b) => a + b, 0);
+    for (const [k, v] of Object.entries(w)) if ((r -= v) <= 0) return k;
+    return 'pass';
+  },
   // ---- teammates ----
   assistQ: A => (A.pas || 50) / 600                                         // better final balls → teammates score more
 };
@@ -382,15 +415,21 @@ const FBS = {
 };
 
 /* Moment types each position is involved in (shared by played and simulated matches) */
-const FB_MIX = {
-  FW: ['box', 'box', 'box', 'thru', 'thru', 'edge', 'counter', 'drive', 'fk'],
-  W: ['wing', 'wing', 'wing', 'drive', 'drive', 'box', 'edge', 'counter', 'fk'],
-  AM: ['edge', 'edge', 'pass', 'pass', 'box', 'drive', 'thru', 'fk'],
-  CM: ['pass', 'pass', 'pass', 'edge', 'drive', 'fk', 'box'],
-  DF: ['pass', 'pass', 'drive', 'edge', 'fk', 'box']
+// Scenario weights by position (how often each kind of moment reaches you). Every kind can happen to everyone,
+// but at a frequency that fits the role. FBX.pickScene adjusts them for team strength, score and minute.
+const FB_SCEN = {
+  FW: { box: 3, thru: 2.5, drive: 1, oneone: 1, late: .8, edge: .9, counter: 1, long: .4, pass: .4, wing: .3, own: .15, fk: .5 },
+  W: { wing: 3, drive: 1.6, oneone: 1, counter: 1.2, box: .9, edge: .9, late: .5, long: .5, thru: .6, pass: .5, own: .3, fk: .5 },
+  AM: { edge: 1.6, pass: 1.8, long: 1.2, box: .9, late: .8, drive: .9, thru: .9, counter: .8, oneone: .4, own: .4, wing: .4, fk: .7 },
+  CM: { pass: 2.6, own: 1.2, edge: 1.3, long: 1.2, drive: .9, counter: .8, late: .6, box: .4, thru: .3, wing: .3, fk: .6 },
+  DF: { pass: 1.8, own: 2, box: .6, drive: .5, long: .3, late: .3, edge: .3, fk: .4, counter: .2 }
 };
+// Legacy flat lists (kept for older code paths): each type repeated by its rounded weight
+const FB_MIX = Object.fromEntries(Object.entries(FB_SCEN).map(([k, w]) => [k, Object.entries(w).flatMap(([t, n]) => Array(Math.max(1, Math.round(n))).fill(t))]));
 // Expected defensive moments per match by position
 const FB_DEFN = { FW: .9, W: 1.2, AM: 1.4, CM: 1.8, DF: 2.8 };
+// Average number of attacking moments per 90 minutes by position
+const FB_ATTN = { FW: 5.5, W: 5.25, AM: 5, CM: 4.25, DF: 2.75 };
 
 // Turkish case suffix for a proper name, following vowel harmony: acc (-(y)I), dat (-(y)A), gen (-(n)In), loc (-DA), abl (-DAn)
 FBU.ek = function (name, kind) {

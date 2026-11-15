@@ -102,7 +102,7 @@
 .fbm-t{display:flex;align-items:center;gap:5px}.fbm-sc{font-size:20px;font-weight:900;min-width:58px;text-align:center}.fbm-min{background:#16a34a;border-radius:7px;padding:2px 7px;font-weight:800;font-size:12px}
 .fbm-sub{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 44px);left:50%;transform:translateX(-50%);display:flex;gap:8px;font-size:11px;pointer-events:none;white-space:nowrap}.fbm-sub span{background:rgba(0,0,0,.55);padding:2px 8px;border-radius:999px}
 .fbm-rt{color:#fde047;font-weight:800}.fbm-rt.bump{animation:bmp .4s}
-.fbm-pause{position:absolute;top:max(8px,env(safe-area-inset-top));right:8px;width:40px;height:40px;border-radius:12px;background:rgba(0,0,0,.6);font-size:18px}
+.fbm-pause{position:absolute;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));width:40px;height:40px;border-radius:12px;background:rgba(0,0,0,.6);font-size:18px}
 .fbm-ban{position:absolute;left:0;right:0;top:34%;text-align:center;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:4px}
 .fbm-ban b{font-size:54px;font-weight:900;font-style:italic;letter-spacing:1px;color:#fde047;text-shadow:0 4px 0 #b45309,0 8px 24px #000}.fbm-ban b.sm{font-size:26px;color:#86efac;text-shadow:0 3px 0 #14532d,0 6px 18px #000}
 .fbm-ban span{background:rgba(0,0,0,.65);padding:5px 12px;border-radius:10px;font-weight:700}
@@ -111,7 +111,7 @@
 .fbm-pop{position:absolute;left:50%;top:24%;transform:translateX(-50%);font-weight:900;font-size:20px;text-shadow:0 2px 6px #000;opacity:0;pointer-events:none;white-space:nowrap}
 .fbm-pop.on{animation:fbpop 1.4s ease-out}
 @keyframes fbpop{0%{opacity:0;transform:translate(-50%,10px) scale(.7)}15%{opacity:1;transform:translate(-50%,0) scale(1.1)}70%{opacity:1}100%{opacity:0;transform:translate(-50%,-24px)}}
-.fbm-mom{pointer-events:none;position:absolute;left:8px;right:8px;bottom:max(10px,env(safe-area-inset-bottom));background:rgba(0,0,0,.72);border-radius:16px;padding:9px 12px;border:1px solid rgba(253,224,71,.5)}
+.fbm-mom{pointer-events:none;position:absolute;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom));background:rgba(0,0,0,.72);border-radius:16px;padding:9px 12px;border:1px solid rgba(253,224,71,.5)}
 .fbm-mt{font-weight:800;color:#fde047;font-size:14px}.fbm-hint{font-size:11.5px;color:var(--sub);margin:4px 0}
 .fbm-bar{height:5px;border-radius:3px;background:rgba(255,255,255,.15);overflow:hidden;margin-top:5px}.fbm-bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ef4444,#fde047,#22c55e)}
 .fbm-ctl{display:flex;gap:10px;align-items:center}.fbm-lob{padding:7px 12px;border-radius:10px;background:rgba(255,255,255,.12);font-weight:700;font-size:13px}.fbm-lob.on{background:#0ea5e9;color:#fff}
@@ -149,7 +149,7 @@
 .fbm-ban b.op{color:#f87171;text-shadow:0 4px 0 #7f1d1d,0 8px 24px #000}
 .fbm-sb,.fbm-sub,.fbm-pause{z-index:2}
 .fbm-hint b{color:#fde047}
-.fbm-shot{position:absolute;left:8px;right:8px;bottom:max(10px,env(safe-area-inset-bottom));display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:8px 10px;background:rgba(0,0,0,.76);border:1px solid rgba(253,224,71,.5);border-radius:18px;padding:10px 12px;z-index:2;animation:fbin .3s}
+.fbm-shot{position:absolute;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom));display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:8px 10px;background:rgba(0,0,0,.76);border:1px solid rgba(253,224,71,.5);border-radius:18px;padding:10px 12px;z-index:2;animation:fbin .3s}
 .fbm-sh-l{display:flex;flex-direction:column;gap:4px;min-width:0}
 .fbm-sh-t{font-weight:800;color:#fde047;font-size:14px}.fbm-sh-fx{font-weight:700;font-size:15px}.fbm-sh-pw{font-size:12px;color:var(--sub)}
 .fbm-sh-back{align-self:flex-start;padding:7px 11px;border-radius:10px;background:rgba(255,255,255,.12);font-size:12px;font-weight:700;margin-top:2px}
@@ -162,7 +162,7 @@
 .fbm-sball .sb-t{top:0;left:0;right:0}.fbm-sball .sb-b{bottom:0;left:0;right:0}.fbm-sball .sb-l{left:-8px;top:50%;transform:translateY(-50%)}.fbm-sball .sb-r{right:-8px;top:50%;transform:translateY(-50%)}
 .fbm-sh-go{grid-column:1;padding:13px;border-radius:14px;background:linear-gradient(180deg,#ef4444,#b91c1c);font-weight:900;font-size:18px;box-shadow:0 3px 0 #7f1d1d;color:#fff}
 .fbm-sh-go:active{transform:scale(.96)}
-@media (orientation:landscape){.fbm-shot{left:auto;right:8px;width:340px}}
+@media (orientation:landscape){.fbm-shot{left:auto;right:max(8px,env(safe-area-inset-right));width:340px}}
 .fb-king{display:flex;gap:6px;width:100%;margin-top:10px;text-align:left}.fb-king>div{flex:1;padding:9px 10px;border-radius:12px;background:linear-gradient(135deg,rgba(234,179,8,.18),rgba(255,255,255,.04));display:flex;flex-direction:column;gap:1px;min-width:0}
 .fb-king span{font-size:11px;color:var(--sub);font-weight:700}.fb-king b{font-size:22px;color:#fde047}.fb-king small{font-size:10.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fb-rk{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:12px;font-weight:800;background:rgba(255,255,255,.08);flex:none}.fb-rk.m0{background:#ca8a04;color:#fff}.fb-rk.m1{background:#94a3b8;color:#111}.fb-rk.m2{background:#b45309;color:#fff}
@@ -302,3 +302,8 @@ button.fb-li:active,.fb-chip:active,.fb-team:active,.fb-hl:active,.fb-king:activ
 .fb-attfx{margin:-2px 0 8px;font-size:11px;opacity:.6}
 
 .fb-ha{display:block;font-size:10.5px;opacity:.65;margin-top:2px}.fb-xi h5 .fb-badge{vertical-align:middle}.fb-xi.mine h5{color:var(--acc,#ffd400)}.fb-gt{opacity:.7;font-size:10px;letter-spacing:.04em}
+
+/* Safe areas left/right (landscape notch / Dynamic Island) */
+.fb-top{padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right))}
+.fb-main{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+.fb-bnav{padding-left:max(4px,env(safe-area-inset-left));padding-right:max(4px,env(safe-area-inset-right))}
