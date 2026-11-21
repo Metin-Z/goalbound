@@ -33,7 +33,7 @@ function FBMatch(host, o) {
   /* ---------- Players (team 0 = us, attacking towards y = 0) ---------- */
   const ANCH = { GK: [34, 101], LB: [9, 82], LCB: [25, 88], RCB: [43, 88], RB: [59, 82], LCM: [20, 68], CM: [34, 72], RCM: [48, 68], LW: [11, 50], ST: [34, 46], RW: [57, 50] };
   const userRole = { FW: 'ST', W: 'RW', AM: 'RCM', CM: 'CM', DF: 'RCB' }[U.pos];
-  const mkTeam = (t, side) => FBT.squad(t.id).map(sp => ({ ...sp, team: side, x: 0, y: 0, vx: 0, vy: 0, ph: Math.random() * 6, face: side ? Math.PI / 2 : -Math.PI / 2, st: 'run', stT: 0, user: false, lane: null }));
+  const mkTeam = (t, side) => FBT.squad(t.id).map(sp => ({ ...sp, pf: FBT.prof(t.id, sp.role, sp.sk), team: side, x: 0, y: 0, vx: 0, vy: 0, ph: Math.random() * 6, face: side ? Math.PI / 2 : -Math.PI / 2, st: 'run', stT: 0, user: false, lane: null }));
   const T0 = mkTeam(o.my, 0), T1 = mkTeam(o.opp, 1);
   const me = T0.find(p => p.role === userRole);
   Object.assign(me, { name: U.name, short: U.short, user: true });
@@ -54,7 +54,7 @@ function FBMatch(host, o) {
   function genEvents(from, to) {
     // Same scoring model as simulated matches (FBX.lam); the user's own moments are part of the team's
     // expected goals, so the background goal events are reduced by what the user's chances usually produce
-    const span = (to - from) / 90, [lM, lO] = FBX.lam(o.my.r, o.opp.r, o.home ? 1 : -1), nAtt = FB_ATTN[U.pos];
+    const span = (to - from) / 90, [lM, lO] = FBX.lam(o.my.r + ((o.fr || [])[0] || 0), o.opp.r + ((o.fr || [])[1] || 0), o.home ? 1 : -1), nAtt = FB_ATTN[U.pos];
     const lamMy = Math.max(.12, lM - nAtt * .16) * span, lamOp = Math.max(.12, lO - FB_DEFN[U.pos] * .6 * .1) * span;
     const ev = [], t = () => from + 1 + R() * (to - from - 2);
     for (let i = FBU.poisson(lamMy); i > 0; i--) ev.push({ m: t(), team: 0, out: 'goal' });
@@ -107,13 +107,17 @@ function FBMatch(host, o) {
 
   /* ---------- Ticker (fast-forward) ---------- */
   const SHOOTERS = t => (t ? T1 : T0).filter(p => ['ST', 'LW', 'RW', 'RCM', 'CM', 'LCM'].includes(p.role) && !p.user);
-  const assistFor = (side, shooter) => R() < .72 ? FBU.pick((side ? T1 : T0).filter(p => p !== shooter && p.role !== 'GK' && !p.user)) : null;
+  // Weighted pick: role share × style × a little randomness, so goals and assists spread over the squad
+  const wPick = (arr, f) => { const w = arr.map(f), t = w.reduce((a, b) => a + b, 0); let x = R() * t; for (let i = 0; i < arr.length; i++) if ((x -= w[i]) < 0) return arr[i]; return arr[0]; };
+  const GROLE = { ST: 3, LW: 1.7, RW: 1.7, LCM: .7, CM: .6, RCM: .8 }, AROLE = { LW: 1.7, RW: 1.7, RCM: 1.3, LCM: 1.3, CM: 1.2, ST: .9, LB: .8, RB: .8, LCB: .2, RCB: .2 };
+  const pickShooter = side => wPick(SHOOTERS(side), p => (GROLE[p.role] || .5) * FBT.styleW(p.pf.style, 'g'));
+  const assistFor = (side, shooter) => R() < .72 ? wPick((side ? T1 : T0).filter(p => p !== shooter && p.role !== 'GK' && !p.user), p => (AROLE[p.role] || .5) * FBT.styleW(p.pf.style, 'a')) : null;
   function simEvent(e) {
     if (e.fromFoul) feed(`🟨 ${mm()}' Faul sonrası ${FBU.esc(o.opp.abbr)} serbest vuruş kullanıyor`, 'gc');
     if (e.fromErr) feed(`⚠️ ${mm()}' Top kaybından sonra ${FBU.esc(o.opp.abbr)} hızlı çıktı!`, 'gc');
-    if (e.fromMe) feed(`🚀 ${mm()}' ${FBU.esc(me.short)}'in pasıyla atak başladı!`, 'me');
+    if (e.fromMe) feed(`🚀 ${mm()}' ${FBU.esc(FBU.ek(me.short, 'gen'))} pasıyla atak başladı!`, 'me');
     if (e.fromErr && e.out === 'goal') { st.us.err = (st.us.err || 0) + 1; }
-    const side = e.team, shooter = FBU.pick(SHOOTERS(side)), tm = side ? o.opp : o.my, gk = side ? GK0 : GK1, ours = side === 0;
+    const side = e.team, shooter = pickShooter(side), tm = side ? o.opp : o.my, gk = side ? GK0 : GK1, ours = side === 0;
     const nm = `<b>${FBU.esc(shooter.short)}</b> <small>(${FBU.esc(tm.abbr)})</small>`;
     st.shots[side]++;
     if (e.out === 'goal') {
@@ -144,17 +148,23 @@ function FBMatch(host, o) {
   }
 
   /* ---------- Scenes: build-up right before the ball reaches the user ---------- */
-  const sceneNow = () => FBX.pickScene(U.pos, { dr: o.my.r - o.opp.r, diff: st.sc[0] - st.sc[1], min: st.min });
+  const sceneNow = () => { const k = FBX.pickScene(U.pos, { dr: o.my.r - o.opp.r, diff: st.sc[0] - st.sc[1], min: st.min, recent: FBX.recent, home: o.home, form: o.formD || 0 }); FBX.recent = [k].concat(FBX.recent || []).slice(0, 6); return k; };
   let mom = null;
   const MT0 = { def: '🛡️ Topu kazandın! Hücumu başlat', thru: '🏃 Savunma arkasına koştun — ara pas geliyor!', drive: '🏃 TOPU SÜR! Hedef bölgeye ulaş' };
-  const MT = { ...MT0, box: '🎯 Ceza sahasında topla buluştun!', edge: '💥 Ceza yayı önündesin', counter: '⚡ Kontra atak! Topu sür, bitir', wing: '↗️ Kanattasın — orta ya da şut', pass: '🧠 Oyunu kur — ara pasını ver', fk: '🎯 Serbest vuruş!', pen: '⚽ PENALTI!', long: '🚀 Uzaktan şut fırsatı', own: '🧱 Kendi yarı sahanda baskı altındasın', late: '🏃 Ceza sahasına geç koşu!', oneone: '⚔️ Bire bir!' };
-  const HINT = { drive0: 'Parmağını sahada tut: oyuncun parmağına doğru koşar, top ayağında. Sarı hedefe ulaş!', def: 'Boştaki arkadaşına ileri pas ver — kötü pas rakibe tehlikeli atak verir', thru: 'Kaleciyle karşı karşıyasın: köşe ya da aşırtma', drive: 'Parmağını basılı tutup sürükle: oyuncun o yöne koşar, top ayağında ilerler', box: 'Köşeye vur — kaleci tek kişi!', edge: 'Uzaktan şut veya koşucuya pas', counter: 'Kısa sürüklemelerle ilerle, sonra vur', wing: 'Aşırt açıkken koşuculara orta', pass: 'Boşta koşan arkadaşına ara pas', fk: 'Barajı aş: orta güç + Aşırt, Falso ile kıvır', long: 'Savunma geride: sert ve isabetli vur ya da pas ver', own: 'Rakip baskı yapıyor: hızlıca boştaki arkadaşına pas ver', late: 'Geri pas geliyor: ilk vuruşta bitir', oneone: 'Savunmacıyı geç, ceza sahasındaki hedefe gir', pen: 'Köşe seç, güçlü vur — kaleci tahmin edecek' };
+  const MT = { ...MT0, box: '🎯 Ceza sahasında topla buluştun!', edge: '💥 Ceza yayı önündesin', counter: '⚡ Kontra atak! Topu sür, bitir', wing: '↗️ Kanattasın — orta ya da şut', pass: '🧠 Oyunu kur — ara pasını ver', fk: '🎯 Serbest vuruş!', pen: '⚽ PENALTI!', long: '🚀 Uzaktan şut fırsatı', own: '🧱 Kendi yarı sahanda baskı altındasın', late: '🏃 Ceza sahasına geç koşu!', oneone: '⚔️ Bire bir!', cross: '🎯 Orta geliyor! Kafa / vole', corner: '🚩 Korner! Kafa vuruşu', rebound: '🧤 Kaleci çeldi — top önünde!', layoff: '🔄 Sırtın dönük — bırak ya da dön', switch: '↔️ Oyunun yönünü değiştir', second: '⚡ İkinci top sende!' };
+  const HINT = { drive0: 'Parmağını sahada tut: oyuncun parmağına doğru koşar, top ayağında. Sarı hedefe ulaş!', def: 'Boştaki arkadaşına ileri pas ver — kötü pas rakibe tehlikeli atak verir', thru: 'Kaleciyle karşı karşıyasın: köşe ya da aşırtma', drive: 'Parmağını basılı tutup sürükle: oyuncun o yöne koşar, top ayağında ilerler', box: 'Köşeye vur — kaleci tek kişi!', edge: 'Uzaktan şut veya koşucuya pas', counter: 'Kısa sürüklemelerle ilerle, sonra vur', wing: 'Aşırt açıkken koşuculara orta', pass: 'Boşta koşan arkadaşına ara pas', fk: 'Barajı aş: orta güç + Aşırt, Falso ile kıvır', long: 'Savunma geride: sert ve isabetli vur ya da pas ver', own: 'Rakip baskı yapıyor: hızlıca boştaki arkadaşına pas ver', late: 'Geri pas geliyor: ilk vuruşta bitir', oneone: 'Savunmacıyı geç, ceza sahasındaki hedefe gir', pen: 'Köşe seç, güçlü vur — kaleci tahmin edecek', cross: 'Top havada: ilk vuruşta kaleye yönelt, sert çekme', corner: 'Kafayla köşeye yönelt ya da arkadaşına indir', rebound: 'Hemen vur — kaleci yerde', layoff: 'Arkadan gelen arkadaşına bırak ya da dönüp vur', switch: 'Uzak kanattaki boş arkadaşına uzun pas', second: 'Uzaktan vur ya da hücumu sürdür' };
   // Where the ball reaches the user depends on his position
   function momentSpot(type) {
     const r = R(), side = r < .5 ? -1 : 1, P = U.pos;
     if (type === 'thru') return { x: 34 + side * R() * 7, y: 14 + R() * 3 };
     if (type === 'long') return { x: 34 + side * R() * 10, y: 27 + R() * 5 };
     if (type === 'late') return { x: 34 + side * (1 + R() * 4), y: 11 + R() * 3 };
+    if (type === 'cross') return { x: 34 + side * (1 + R() * 5), y: 7 + R() * 5 };
+    if (type === 'corner') return { x: 34 + side * R() * 6, y: 8 + R() * 5 };
+    if (type === 'rebound') return { x: 34 + side * (2 + R() * 6), y: 8 + R() * 6 };
+    if (type === 'layoff') return { x: 34 + side * R() * 8, y: 22 + R() * 5 };
+    if (type === 'switch') return { x: 34 + side * (8 + R() * 8), y: 46 + R() * 8 };
+    if (type === 'second') return { x: 34 + side * R() * 10, y: 26 + R() * 6 };
     if (type === 'oneone') return { x: 34 + side * (3 + R() * 9), y: 31 + R() * 4 };
     if (type === 'own') return { x: 34 + side * (4 + R() * 12), y: ({ DF: 76, CM: 64, AM: 58, W: 60, FW: 55 }[P] || 62) + R() * 5 };
     if (type === 'def') { const S = { FW: [34 + side * R() * 12, 58], W: [r < .5 ? 8 + R() * 4 : 56 + R() * 4, 64], AM: [34 + side * R() * 8, 64], CM: [34 + side * R() * 8, 72], DF: [34 + side * (3 + R() * 8), 84] }[P]; return { x: S[0], y: S[1] + R() * 4 }; }
@@ -179,6 +189,33 @@ function FBMatch(host, o) {
       opps.slice(1).forEach(p => { p.x = clamp(p.x + (p.x > 34 ? 12 : -12), 2, 66); p.y += 8; }); m.defs = opps.slice(0, 1);
       m.target = { x: 34 + (spot.x > 34 ? 4 : -4), y: 14, r: 3 };
     }
+    // Crosses and corners: a lofted delivery that the user must meet first time in the air (header or volley)
+    if (kind === 'cross' || kind === 'corner') {
+      const B = m.feeder, wx = kind === 'corner' ? (spot.x < 34 ? .8 : 67.2) : (spot.x < 34 ? 5 : 63), wy = kind === 'corner' ? .8 : 12 + R() * 8;
+      B.x = wx; B.y = wy + (kind === 'corner' ? 0 : 3); m.air = true; m.lim = 2.4;
+      st.script.forEach(c => { if (c.k === 'pass' && c.to === B) { c.tx = wx; c.ty = wy; c.sp = 20; } if (c.k === 'pass' && c.to === me) { c.sp = 19; c.h = 3.2; } });
+      me.y = spot.y + 5; opps.forEach((p, i) => { p.x = clamp(spot.x + (i - .5) * 3 + (R() - .5) * 2, 2, 66); p.y = clamp(spot.y + 1 - i * 1.5, 2, 30); });
+      if (kind === 'corner') T1.filter(p => p.role !== 'GK' && !opps.includes(p)).slice(0, 3).forEach((p, i) => { p.x = 28 + i * 6; p.y = 6 + R() * 6; });
+    }
+    if (kind === 'rebound') {   // a team-mate's shot is parried and drops to the user: no time, finish first time
+      const B = m.feeder; B.x = clamp(spot.x + (spot.x > 34 ? -8 : 8), 6, 62); B.y = 18 + R() * 4; m.lim = 1.8; m.quick = true; m.feeder = null;
+      st.script = [{ k: 'wait', t: .4 }, { k: 'pass', from: m.a0, to: B, tx: B.x, ty: B.y, sp: 18 }, { k: 'do', fn: () => feed(`💥 ${mm()}' ${FBU.esc(B.short)} vurdu, ${FBU.esc(GK1.short)} çeldi!`, 'me') }, { k: 'pass', from: B, to: GK1, tx: GK1.x, ty: GK1.y, sp: 24, h: .6 }, { k: 'pass', from: GK1, to: me, tx: spot.x, ty: spot.y, sp: 11 }, { k: 'do', fn: beginMoment }];
+      me.y = spot.y + 3; opps.forEach((p, i) => { p.x = clamp(spot.x + (i ? 3 : -3), 2, 66); p.y = spot.y + 2 + i; });
+    }
+    if (kind === 'layoff') {   // back to goal: a defender tight behind, runners arriving from deeper
+      m.style = 'press'; m.lim = 3.2; const d0 = opps[0]; d0.x = spot.x + (R() - .5); d0.y = spot.y - 1.3; opps.slice(1).forEach((p, i) => { p.x = clamp(spot.x + (i ? 7 : -7), 2, 66); p.y = spot.y - 5; });
+      m.mates.forEach((p, i) => { p.x = clamp(spot.x + (i ? 9 : -9), 4, 64); p.y = spot.y + 9; p.goal = { x: clamp(spot.x + (i ? 6 : -6), 6, 62), y: spot.y - 2 }; });
+    }
+    if (kind === 'switch') {   // ball side crowded, the far winger alone out wide
+      opps.forEach(p => { p.x = clamp(spot.x + (p.x - spot.x) * .6, 2, 66); });
+      const far = spot.x < 34 ? 60 : 8, w = m.mates[0]; if (w) { w.x = far; w.y = spot.y - 8; w.goal = { x: far + (spot.x < 34 ? 2 : -2), y: spot.y - 16 }; }
+      T1.filter(p => p.role !== 'GK' && !opps.includes(p)).forEach(p => { if (Math.abs(p.x - far) < 12) p.x = clamp(p.x + (spot.x < 34 ? -14 : 14), 2, 66); });
+    }
+    if (kind === 'second') {   // a cleared header drops to the user outside the box
+      const D = T1.filter(p => p.role !== 'GK').sort((a, b) => a.y - b.y)[0]; D.x = 34 + (R() - .5) * 8; D.y = 9;
+      ball.x = D.x; ball.y = D.y + .4; attach(D); m.lim = 3.5; m.feeder = null;
+      st.script = [{ k: 'wait', t: .45 }, { k: 'do', fn: () => feed(`↩️ ${mm()}' ${FBU.esc(D.short)} kafayla uzaklaştırdı`, 'mut') }, { k: 'pass', from: D, to: me, tx: spot.x, ty: spot.y, sp: 15, h: 3.5 }, { k: 'do', fn: beginMoment }];
+    }
     // teammates: some burst forward, some come short towards the ball
     m.mates.forEach(p => { if (R() < .3 && p.goal) { p.goal = { x: clamp(p.goal.x + (spot.x - p.goal.x) * .5, 4, 64), y: clamp(spot.y - 6 + R() * 4, 6, 100) }; } });
   }
@@ -188,11 +225,19 @@ function FBMatch(host, o) {
     const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1;
     T1.forEach(p => { if (p.role === 'GK') return; const t = clamp(((p.x - ax) * dx + (p.y - ay) * dy) / l2, 0, 1), qx = ax + dx * t, qy = ay + dy * t, d = Math.hypot(p.x - qx, p.y - qy); if (d < 2.6) { const l = Math.sqrt(l2), nx = -dy / l, ny = dx / l, s = ((p.x - qx) * nx + (p.y - qy) * ny) >= 0 ? 1 : -1; p.x = clamp(qx + nx * s * 3, 1, 67); p.y = clamp(qy + ny * s * 3, 1, 104); } });
   }
+  // Who plays the final ball to the user: depends on the scene (crosses from wide men, through balls from playmakers),
+  // the side of the pitch and each player's style
+  function pickFeeder(kind, left) {
+    const RW_ = { wing: { LB: 2, RB: 2, LCM: 1.5, RCM: 1.5, LW: 1, RW: 1 }, cross: { LW: 3, RW: 3, LB: 1.6, RB: 1.6 }, corner: { LW: 2, RW: 2, LCM: 1.5, RCM: 1.5, CM: 1 }, thru: { CM: 2, LCM: 2, RCM: 2, LW: 1, RW: 1, ST: 1 },
+      pass: { LCB: 1.5, RCB: 1.5, CM: 1.2, LB: 1, RB: 1 }, own: { LCB: 2, RCB: 2, LB: 1, RB: 1 }, switch: { LCB: 1.5, RCB: 1.5, CM: 1.5, LB: 1, RB: 1 }, late: { LW: 2.5, RW: 2.5, LB: 1.2, RB: 1.2 } }[kind] || { CM: 2, LCM: 2, RCM: 2, LW: 1.3, RW: 1.3, ST: 1, LB: .8, RB: .8 };
+    const c = T0.filter(p => p !== me && p.role !== 'GK' && RW_[p.role]);
+    return wPick(c.length ? c : T0.filter(p => p !== me && p.role !== 'GK'), p => (RW_[p.role] || .3) * FBT.styleW(p.pf.style, 'a') * ((p.role[0] === 'L') === left || p.role === 'CM' || p.role === 'ST' ? 1.6 : 1) * (.7 + R() * .6));
+  }
   // Newer scenario kinds reuse the build-up of a base kind and then reshape it (see the switch at the end)
-  const SCENE_BASE = { long: 'edge', own: 'pass', late: 'box', oneone: 'drive' };
+  const SCENE_BASE = { long: 'edge', own: 'pass', late: 'box', oneone: 'drive', cross: 'box', corner: 'box', rebound: 'box', layoff: 'edge', switch: 'pass', second: 'edge' };
   function enterScene(kind) {
     const spot = momentSpot(kind), type = SCENE_BASE[kind] || kind, fk = type === 'fk' || type === 'pen';
-    st.mode = 'scene'; st.ff = false; resetActors();
+    st.mode = 'scene'; st.ff = false; resetActors(); ALL.forEach(p => p.ai = null); st.aiT = 0;
     if (type === 'def') return enterDefScene(spot);
     ALL.forEach(p => { const t = formTarget(p, spot.x, spot.y); p.x = t[0] + (R() - .5) * 2; p.y = t[1] + (R() - .5) * 2; p.face = p.team ? Math.PI / 2 : -Math.PI / 2; });
     GK1.x = 34 + (spot.x - 34) * .12; GK1.y = type === 'pen' ? .4 : clamp(1 + Math.hypot(spot.x - 34, spot.y) / 9, 1, 4.5);
@@ -219,8 +264,8 @@ function FBMatch(host, o) {
       // Build-up: A → B → me, with me running onto the final pass
       const pick = roles => T0.find(p => roles.includes(p.role) && p !== me);
       const left = spot.x < 34;
-      const B = type === 'wing' ? pick(left ? ['LCM', 'LB'] : ['RCM', 'RB']) : type === 'pass' && (U.pos === 'CM' || U.pos === 'DF') ? pick(left ? ['LCB'] : ['RCB']) : pick(['CM', 'LCM', 'RCM']);
-      const Aa = T0.find(p => p !== me && p !== B && p.role !== 'GK' && ['LCB', 'RCB', 'LB', 'RB', 'LCM', 'RCM', 'CM'].includes(p.role) && (left ? p.x < 40 : p.x > 28));
+      const B = pickFeeder(kind, left);
+      const Aa = T0.find(p => p !== me && p !== B && p.role !== 'GK' && ['LCB', 'RCB', 'LB', 'RB', 'LCM', 'RCM', 'CM'].includes(p.role) && (left ? p.x < 40 : p.x > 28)) || T0.find(p => p !== me && p !== B && p.role !== 'GK' && p.role !== 'ST');
       const bx = clamp(type === 'wing' ? spot.x + (34 - spot.x) * .45 : spot.x + (R() - .5) * 14, 6, 62), by = clamp(spot.y + (type === 'pass' ? 16 : type === 'counter' ? 17 : type === 'thru' ? 21 : 13), 8, 98);
       B.x = bx; B.y = by + 3; Aa.x = clamp(bx + (left ? 9 : -9), 3, 65); Aa.y = clamp(by + 11, 10, 100);
       me.x = clamp(spot.x + (34 - spot.x) * .25 + (R() - .5) * 4, 3, 65); me.y = spot.y + (type === 'counter' ? 9 : type === 'thru' ? 10 : 6.5);
@@ -232,12 +277,12 @@ function FBMatch(host, o) {
         const tx = type === 'wing' ? 28 + i * 10 : clamp(spot.x + (i - (nr - 1) / 2) * 14 + (R() - .5) * 6, 8, 60), ty = type === 'pass' ? 30 - R() * 6 : type === 'wing' ? 10 + R() * 4 : clamp(spot.y - 8 - R() * 6, 9, 30);
         p.x = tx + (R() - .5) * 3; p.y = ty + 7; p.goal = { x: tx, y: Math.max(7, ty - 6) }; mom.mates.push(p);
       });
-      mom.feeder = B; feed(`▶ ${mm()}' ${FBU.esc(Aa.short)} → ${FBU.esc(B.short)} → <b>${FBU.esc(me.short)}</b>${type === 'thru' ? ' · ara pas!' : ''}`, 'me');
+      mom.feeder = B; mom.a0 = Aa; feed(`▶ ${mm()}' ${FBU.esc(Aa.short)} → ${FBU.esc(B.short)} → <b>${FBU.esc(me.short)}</b>${type === 'thru' ? ' · ara pas!' : ''}`, 'me');
       st.script = [{ k: 'wait', t: .55 }, { k: 'pass', from: Aa, to: B, tx: bx, ty: by, sp: 16 }, { k: 'wait', t: .3 }, { k: 'pass', from: B, to: me, tx: spot.x, ty: spot.y, sp: type === 'counter' || type === 'thru' ? 20 : 17 }, { k: 'do', fn: beginMoment }];
       sceneVariety(kind, spot);
     }
     cam.x = ball.x; cam.y = ball.y - FRAME * H / cam.s; cam.vx = cam.vy = cam.vs = 0;   // jump the camera while the ticker panel still covers the pitch
-    showTicker(false); FBA.crowdLevel(.55); FBA.play('beat', 1);
+    showTicker(false); crowdLv(.55); FBA.play('beat', 1);
     banner(`<b class="sm">SENİN ANIN</b>`, 1100);
   }
   // Defending: an opponent attack plays out around the user. The carrier dribbles at goal while up to two team-mates run.
@@ -276,7 +321,7 @@ function FBMatch(host, o) {
     feed(`🛡️ ${mm()}' ${FBU.esc(o.opp.abbr)} atakta… ${FBU.esc(car.short)} topla <b>${FBU.esc(me.short)}</b> üzerine geliyor`, 'me');
     st.script = [{ k: 'wait', t: .5 }, { k: 'do', fn: beginDuel }];
     cam.x = (ball.x + me.x) / 2; cam.y = (ball.y + me.y) / 2; cam.vx = cam.vy = cam.vs = 0;
-    showTicker(false); FBA.crowdLevel(.5); FBA.play('beat', 1);
+    showTicker(false); crowdLv(.5); FBA.play('beat', 1);
     banner(`<b class="sm">SAVUNMA</b><span>Konum al · pas yolunu kapat · zamanında müdahale et</span>`, 1400);
   }
   function beginDuel() {
@@ -284,7 +329,7 @@ function FBMatch(host, o) {
     $('.fbm-mt').textContent = '🛡️ Atağı durdur!';
     $('.fbm-hint').innerHTML = `<b>Basılı tut</b>: konum al · <b>dokun</b>: müdahale · <b>hızlı kaydır</b>: kayarak müdahale · pas yolu <b style="color:#fde047">sarı</b> yanınca dokun: <b>pas arası</b>`;
     $('.fbm-bar i').style.width = '100%'; momEl.hidden = false;
-    FBA.crowdLevel(.65);
+    crowdLv(.65);
   }
   // Is the straight lane from (ax,ay) to (bx,by) covered by the user? (distance to the segment within his reach)
   function laneCovered(ax, ay, bx, by, r) {
@@ -322,7 +367,7 @@ function FBMatch(host, o) {
       const PV = TUT ? 8.5 : 12.5, T0r = Math.hypot(r.x - sx, r.y - sy) / PV, g = r.goal || r, l = Math.hypot(g.x - r.x, g.y - r.y) || 1, s = Math.min(l, 5 * T0r);
       const tx = r.x + (g.x - r.x) / l * s, ty = r.y + (g.y - r.y) / l * s;
       m.fly = { kind, x0: sx, y0: sy, x1: tx, y1: ty, t: 0, dur: Math.max(.35, Math.hypot(tx - sx, ty - sy) / PV), to: r, minD: 99 };
-      feed(`↗ ${FBU.esc(c.short)} pası ${FBU.esc(r.short)}'e çıkardı`, 'mut'); FBA.play('pass');
+      feed(`↗ ${FBU.esc(c.short)} pası ${FBU.esc(FBU.ek(r.short, 'dat'))} çıkardı`, 'mut'); FBA.play('pass');
     } else {
       const tx = 34 + (R() - .5) * 6, ty = PL + .3;
       m.fly = { kind, x0: sx, y0: sy, x1: tx, y1: ty, t: 0, dur: Math.max(.3, Math.hypot(tx - sx, ty - sy) / 23), dist: Math.hypot(tx - sx, ty - sy) };
@@ -452,7 +497,7 @@ function FBMatch(host, o) {
     const s = st.script; if (!s || !s.length) return;
     const c = s[0];
     if (c.k === 'wait') { if (!c.go) { c.go = 1; const h = ball.own; if (h && !h.lane) { const a = h.face; moveLane(h, clamp(h.x + Math.cos(a) * c.t * 2.2, 1, 67), clamp(h.y + Math.sin(a) * c.t * 2.2, 1, 104), c.t); } } if ((c.t -= dt) <= 0) s.shift(); }
-    else if (c.k === 'pass') { if (!c.go) { c.go = 1; pass(c.from, c.to, c.tx, c.ty, c.sp); } else if (!ball.fl) s.shift(); }
+    else if (c.k === 'pass') { if (!c.go) { c.go = 1; pass(c.from, c.to, c.tx, c.ty, c.sp, c.h || 0); } else if (!ball.fl) s.shift(); }
     else if (c.k === 'do') { s.shift(); c.fn(); }
   }
   function beginMoment() {
@@ -461,7 +506,7 @@ function FBMatch(host, o) {
     m.mates.forEach(p => p.run = p.goal);
     $('.fbm-mt').textContent = MT[m.type]; $('.fbm-hint').innerHTML = m.base === 'drive' ? `<b>${HINT.drive0}</b> · rakiplerden uzak dur` : `<b>Göndermek istediğin yönün tersine çek, bırak</b> · ${HINT[m.type]}${m.type === 'fk' || m.type === 'pen' ? '' : ' · sahaya dokun = top sür'}`;
     momEl.hidden = false;
-    FBA.crowdLevel(.7); if (m.type !== 'fk' && m.type !== 'pen') FBA.play('beat', 2);
+    crowdLv(.7); if (m.type !== 'fk' && m.type !== 'pen') FBA.play('beat', 2);
     st.crowdJump = Math.max(st.crowdJump, .7);   // the stands rise for a big chance
   }
   // Launch vector from aim direction, power (0..1) and contact point on the ball (cx right+, cy up+, unit disc)
@@ -479,6 +524,7 @@ function FBMatch(host, o) {
       if (zAt(e2) >= 2.3) el = e2;
     }
     if (noisy) {
+      if (mom && mom.air) a += FBX.n() * (2.5 + (1 - FBX.u((A.fizik + A.teknik) / 2)) * 5) * deg;   // timing an air ball is harder: Fizik + Teknik
       a += FBX.n() * kickSig(pw, r2, mom && mom.shootGuess) * deg;   // accuracy: Şut for shots, Pas for passes, Teknik for contact/angle
       el += FBX.n() * FBX.elevSig(A, pw) * deg;
     }
@@ -487,6 +533,9 @@ function FBMatch(host, o) {
   }
   // Direction scatter (degrees, 1 SD) of the user's kick from the current ball spot
   function kickSig(pw, r2, shot) {
+    return kickSig0(pw, r2, shot) * (1 - .06 * (o.uForm || 0));   // in-form players are a little more accurate
+  }
+  function kickSig0(pw, r2, shot) {
     const tight = Math.abs(Math.atan2(ball.x - 34, Math.max(.5, ball.y)));
     return (shot ? FBX.shotSig(A, pw) + FBX.angleSig(A, tight) : FBX.passSig(A, pw)) + FBX.contactSig(A, r2 || 0);
   }
@@ -514,13 +563,28 @@ function FBMatch(host, o) {
   }
   // Is this kick going at the goal mouth (judged on the real curved path)?
   function isShot(path) { if (ball.y > 40) return false; const q = path.find(q => q.y <= 0); return !!q && q.x > GX0 - 3 && q.x < GX1 + 3 && q.z < 12; }
+  const v0Of = (ang, pw, cx2, cy2) => kickVec(ang, pw, cx2, cy2, false);
+  // A teammate standing close to the kick's real path (before it reaches the goal line) means the user is playing a pass,
+  // even inside the box: the input decides, not the pitch zone
+  function laneMate(path) {
+    if (TUT && mom.type === 'box') return null;   // the shooting lesson is always a shot
+    const gT = (path.find(q => q.y <= 0) || { t: 9 }).t;
+    for (const p of mom.mates) for (const q of path) {
+      if (q.t >= gT) break;
+      if (q.z > 1.9 || q.t < .15) continue;
+      const d = Math.hypot(q.x - p.x, q.y - p.y);
+      if (d < 1.4 + Math.min(.8, q.t * 1.0)) return p;
+    }
+    return null;
+  }
   function userKick(ang, pw, cx2, cy2) {
     if (!mom) return;
-    const v0 = kickVec(ang, pw, cx2, cy2, false), shooting = isShot(simPath(v0, ball.x, ball.y));
+    if (mom.air) { pw = Math.min(pw, .62); cy2 = Math.max(cy2, 0); }   // header / volley: less power, kept down
+    const path0 = simPath(v0Of(ang, pw, cx2, cy2), ball.x, ball.y), shooting = isShot(path0) && !laneMate(path0);
     mom.kickM = Math.round(Math.hypot(ball.x - 34, ball.y)); mom.shootGuess = shooting; mom.kickDist = Math.hypot(ball.x - GK1.x, ball.y - GK1.y); GK1.readT = 0; GK1.dived = false; GK1.diveT = 0; mom.defs.forEach(p => p.missed = false);
     const v = kickVec(ang, pw, cx2, cy2, true);
     me.face = ang; me.x = ball.x - Math.cos(ang) * FOOT; me.y = ball.y - Math.sin(ang) * FOOT;
-    ball.own = null; ball.phys = true; Object.assign(ball, v);
+    ball.own = null; ball.phys = true; Object.assign(ball, v); if (mom.air) { ball.z = 1.5; ball.vz = Math.min(ball.vz, .5); }
     mom.phase = 'flight'; mom.ft = 0; mom.shooting = shooting; me.kick = .3; me.lane = null; mom.dribble = null; st.kickT = 0;
     FBA.play('kick', pw); if (shooting) { st.us.sh++; st.shots[0]++; } else planReceive();
     if (mom.type === 'pen') {   // keeper: stays (~22%) or guesses a side; a good keeper sometimes reads the striker
@@ -547,29 +611,34 @@ function FBMatch(host, o) {
   }
   function endMoment(res, info = {}) {
     if (!mom || mom.res) return;
+    if (mom.fol && res !== 'fol') {   // the move after the user's pass: only a direct assist counts for him
+      const lp = mom.fol.last;
+      if ((res === 'assist' || res === 'goal') && info.scorer) { mom.res = 'fol'; momEl.hidden = true; if (lp === me) { st.us.a++; goal(0, info.scorer, me, mom.kickM); } else goal(0, info.scorer, lp !== info.scorer ? lp : null, Math.round(Math.hypot(info.scorer.x - 34, info.scorer.y))); live(); return; }
+      res = 'fol';
+    }
     const m = mom, us = st.us, big = ['box', 'pen', 'counter', 'late', 'oneone'].includes(m.type);
     m.res = res;
     if (res === 'goal') { us.g++; us.sot++; }
     else if (res === 'assist') { us.a++; us.pk++; }
     else if (res === 'pass') { us.pk++; pop('✅ İsabetli pas', '#86efac'); feed(`✅ ${mm()}' ${FBU.esc(me.short)} isabetli pas`, 'me'); }
-    else if (res === 'saved') { us.sot++; feed(`🧤 ${mm()}' ${FBU.esc(me.short)}'in şutunu kaleci çıkardı`, 'me'); }
+    else if (res === 'saved') { us.sot++; feed(`🧤 ${mm()}' ${FBU.esc(FBU.ek(me.short, 'gen'))} şutunu kaleci çıkardı`, 'me'); }
     else if (res === 'post') { us.post++; feed(`🟨 ${mm()}' ${FBU.esc(me.short)} direğe nişanladı`, 'me'); }
     else if (res === 'wide') { us.wide++; feed(`❌ ${mm()}' ${FBU.esc(me.short)} fırsatı auta attı`, 'me'); }
-    else if (res === 'blocked') { us.blk++; feed(`🛡️ ${mm()}' ${FBU.esc(me.short)}'in şutu bloklandı`, 'me'); }
+    else if (res === 'blocked') { us.blk++; feed(`🛡️ ${mm()}' ${FBU.esc(FBU.ek(me.short, 'gen'))} şutu bloklandı`, 'me'); }
     else if (res === 'lost') { us.lost++; feed(`😖 ${mm()}' ${FBU.esc(me.short)} topu kaptırdı`, 'me'); }
-    else if (res === 'beaten') { us.dl = (us.dl || 0) + 1; feed(`😣 ${mm()}' ${FBU.esc(mom.car.short)}, ${FBU.esc(me.short)}'i geçti`, 'me'); }
-    else if (res === 'passed') { us.dl = (us.dl || 0) + 1; feed(`↗ ${mm()}' Pas ${FBU.esc(me.short)}'in arkasına ulaştı`, 'me'); }
+    else if (res === 'beaten') { us.dl = (us.dl || 0) + 1; feed(`😣 ${mm()}' ${FBU.esc(mom.car.short)}, ${FBU.esc(FBU.ek(me.short, 'acc'))} geçti`, 'me'); }
+    else if (res === 'passed') { us.dl = (us.dl || 0) + 1; feed(`↗ ${mm()}' Pas ${FBU.esc(FBU.ek(me.short, 'gen'))} arkasına ulaştı`, 'me'); }
     else if (res === 'shotx') { us.dl = (us.dl || 0) + 1; feed(`⚠️ ${mm()}' Rakip şut yolunu boş buldu`, 'me'); }
     else if (res === 'block') { us.bl = (us.bl || 0) + 1; feed(`🧱 ${mm()}' ${FBU.esc(me.short)} şutu blokladı`, 'me'); }
     else if (res === 'deflect') { feed(`✋ ${mm()}' ${FBU.esc(me.short)} pası araya girip uzaklaştırdı`, 'me'); }
     else if (res === 'foul') { us.fl = (us.fl || 0) + 1; feed(`🟨 ${mm()}' ${FBU.esc(me.short)} faul yaptı`, 'me'); }
-    else if (res === 'passfail') { us.pf++; feed(`❌ ${mm()}' ${FBU.esc(me.short)}'in pası rakibe gitti`, 'me'); }
+    else if (res === 'passfail') { us.pf++; feed(`❌ ${mm()}' ${FBU.esc(FBU.ek(me.short, 'gen'))} pası rakibe gitti`, 'me'); }
     if (big && m.shooting && ['saved', 'wide', 'post', 'blocked'].includes(res)) { us.miss++; }
     momEl.hidden = true; m.defs.forEach(p => p.wall = false);
     if (m.type === 'def' && !TUT) defAftermath(res);
     if (res === 'goal') { (us.gd || (us.gd = [])).push(m.kickM); goal(0, me, m.feeder, m.kickM); }
     else if (res === 'assist') goal(0, info.scorer, me, m.kickM);
-    else { refreshRating(); st.mode = 'after'; st.afterT = res === 'pass' ? 1.9 : 1.5; FBA.crowdLevel(.3); }
+    else { refreshRating(); st.mode = 'after'; st.afterT = res === 'pass' ? 1.9 : res === 'fol' ? 1.2 : 1.5; crowdLv(.3); }
     live();
   }
   function stepMoment(dt) {
@@ -581,9 +650,10 @@ function FBMatch(host, o) {
     if (m.phase === 'drive') { m.t += dt; idleStep(m, dt); if (m.res || m.phase !== 'drive') return; driveStep(m, dt); return; }
     m.t += dt;
     if (m.phase === 'setup' && m.t > .35) m.phase = 'aim';
+    if (m.phase === 'aim' && !m.res && (m.air || m.quick) && m.t > m.lim && !m.drag) { pop('⏱ Top düşmeden vurdun', '#fde68a'); autoAct(m); return; }   // first-time ball: no waiting
     if (m.phase === 'aim' && !m.res) { idleStep(m, dt); if (m.res || m.phase !== 'aim') return; }
     const over = m.t > m.lim + 1.35;
-    m.mates.forEach(p => { if (p.run && !p.lane && m.phase !== 'flight' && m.recv !== p) moveTo(p, p.run.x, p.run.y, 4.2, dt); });
+    m.mates.forEach(p => { if (p.run && !p.lane && (m.phase !== 'flight' || m.fol) && m.recv !== p && p !== ball.own) moveTo(p, p.run.x, p.run.y, 4.2, dt); });
     if (m.phase === 'aim' && !m.res) {
       if (m.dribble) {
         const sp = FBX.pace(A), dx = m.dribble.x - me.x, dy = m.dribble.y - me.y, l = Math.hypot(dx, dy);
@@ -599,6 +669,7 @@ function FBMatch(host, o) {
       gkReact(dt);
       if (m.ft > 3.2 && !m.res) { pop(m.shooting ? '😩 Auta gitti' : 'Top dışarıda', '#ddd'); endMoment(m.shooting ? 'wide' : 'passfail'); }
     }
+    if (m.phase === 'follow' && !m.res) { followStep(m, dt); if (m.res) return; }
     if (m.recv) {   // teammate settling the ball before he plays on
       const p = m.recv;
       if (ball.own === p && !m.recvDone && Math.hypot(ball.x - p.x, ball.y - p.y) < FOOT + .1) { m.recvDone = true; afterReceive(p); }
@@ -714,18 +785,72 @@ function FBMatch(host, o) {
   }
   function afterReceive(p) {
     const inBox = p.y < 22 && Math.abs(p.x - 34) < 17;
-    if (!inBox) { endMoment('pass'); return; }
-    mom.passer = p; mom.shooting = false; mom.checked = false; GK1.dived = false;
-    mom.wait = .4;   // short touch, then the teammate shoots
+    if (!mom.fol && (TUT || !inBox)) { if (TUT) { endMoment('pass'); return; } startFollow(p); return; }
+    if (!mom.fol) { userPassOk(); mom.fol = { car: p, t: 0, dec: 1, last: me, n: 0 }; }
+    if (!inBox) { mom.phase = 'follow'; mom.fol.car = p; mom.fol.dec = .5 + R() * .5; return; }
+    aiShoot(p, .4);
+  }
+  // The receiver (or any team-mate in a followed attack) shoots after a touch; quality from his Şut, the final ball and form
+  function aiShoot(p, wait) {
+    mom.passer = p; mom.shooting = false; mom.checked = false; GK1.dived = false; mom.phase = 'follow';
+    mom.wait = wait;   // short touch, then the teammate shoots
+    const lp = mom.fol ? mom.fol.last : me, feedQ = lp === me ? FBX.assistQ(A) : (lp && lp.pf ? lp.pf.at.pas / 600 : .1);
     mom.finish = () => {
-      if (!mom || mom.res) return;
-      const pg = clamp(.33 + (22 - p.y) / 38 + (o.my.r - o.opp.r) / 90 + FBX.assistQ(A), .18, .78), goalIt = R() < pg;
+      if (!mom || mom.res || ball.own !== p) return;
+      const pg = clamp(.58 - Math.hypot(p.x - 34, p.y) * .024 + (o.my.r - o.opp.r) / 90 + feedQ * .6 + ((p.pf ? p.pf.at.sut : 65) - 65) / 220 + (o.formD || 0) * .004, .04, .7), goalIt = R() < pg;
       const tx = goalIt ? (R() < .5 ? GX0 + .5 + R() : GX1 - .5 - R()) : (R() < .5 ? GK1.x : (R() < .5 ? GX0 - 1.5 : GX1 + 1.5));
       const ang = Math.atan2(-.2 - p.y, tx - p.x); p.face = ang; p.kick = .3; mom.kickM = Math.round(Math.hypot(p.x - 34, p.y));
       ball.x = p.x + Math.cos(ang) * FOOT; ball.y = p.y + Math.sin(ang) * FOOT; ball.own = null; ball.phys = true;
       ball.vx = Math.cos(ang) * 24; ball.vy = Math.sin(ang) * 24; ball.vz = 2.5; ball.side = ball.bs = 0;
       FBA.play('kick', .8); mom.checked = goalIt; mom.ft = 0; mom.phase = 'flight'; GK1.readT = 0; GK1.dived = false; GK1.diveT = 0;
     };
+  }
+  /* ---------- Followed attack after the user's pass ----------
+     The camera stays wide while team-mates play the move out with real ball physics: the carrier dribbles, passes
+     (any player can cut it out), crosses or shoots, according to his profile; it ends on a goal, save, ball out,
+     lost possession or after a few seconds of nothing happening. */
+  function userPassOk() { const us = st.us; us.pk++; pop('✅ İsabetli pas', '#86efac'); feed(`✅ ${mm()}' ${FBU.esc(me.short)} isabetli pas`, 'me'); refreshRating(); live(); }
+  function startFollow(p) {
+    userPassOk();
+    mom.fol = { car: p, t: 0, dec: .45 + R() * .5, last: me, n: 0 }; mom.phase = 'follow';
+    mom.mates = T0.filter(q => q !== me && q.role !== 'GK'); mom.defs = T1.filter(q => q.role !== 'GK'); mom.defs.forEach(q => { q.wall = false; q.react = null; });
+    $('.fbm-mt').textContent = '👀 Atak sürüyor'; momEl.hidden = true;
+  }
+  function followStep(m, dt) {
+    const f = m.fol, car = ball.own; f.t += dt;
+    if (f.t > 9) { feed(`⏸ ${mm()}' Atak yavaşladı, top geriye döndü`, 'mut'); endMoment('fol'); return; }
+    if (!car || car.team !== 0 || car === me || m.passer) return;
+    f.car = car;
+    moveTo(me, 34 + (me.x - 34) * .6, Math.max(9, car.y - 3), 4, dt, .5);   // the user keeps supporting the move
+    // dribble towards goal, drifting away from the nearest opponent
+    const opp = T1.filter(q => q.role !== 'GK' && !(q.stun > 0)).sort((a, b) => d2(a, car) - d2(b, car)), n0 = opp[0];
+    let tx = 34 + (car.x - 34) * (car.pf.style === 'inverted' ? .4 : .85), ty = Math.max(4, car.y - 6);
+    if (n0 && d2(n0, car) < 4) { const side = car.x > n0.x ? 1 : -1; tx = car.x + side * 3; }
+    moveTo(car, tx, ty, 4.6 + (car.pf.at.hiz - 60) * .03, dt, .1);
+    // two nearest opponents close him down; a tackle can win the ball
+    opp.slice(0, 2).forEach((q, i) => accelMove(q, car.x + (i ? 2 : 0), car.y - (i ? 1.5 : .6), DEF_V() * (i ? .85 : 1), dt));
+    if (n0 && d2(n0, car) < .9 && (n0.cool = (n0.cool || 0) - dt) <= 0) {
+      n0.cool = .8; const win = clamp(.3 + (n0.sk || .7) * .3 - (car.pf.at.teknik - 60) / 160 + (car.pf.style === 'dribbler' ? -.08 : 0), .12, .6);
+      if (R() < win) { FBA.play('tackle'); n0.face = Math.atan2(ball.y - n0.y, ball.x - n0.x); attach(n0); feed(`😖 ${mm()}' ${FBU.esc(n0.short)} araya girip topu aldı`, 'mut'); endMoment('fol'); return; }
+    }
+    if ((f.dec -= dt) > 0) return;
+    f.dec = .55 + R() * .6;
+    const inBox = car.y < 22 && Math.abs(car.x - 34) < 17, sty = car.pf.style;
+    if (inBox && R() < .6 || car.y < 28 && Math.abs(car.x - 34) < 12 && R() < (sty === 'longshot' ? .35 : .08)) return aiShoot(car, .15);
+    // cross from wide and deep, otherwise the most open forward option (playmakers look for it more)
+    const wide = Math.abs(car.x - 34) > 17 && car.y < 26, opts = m.mates.filter(q => q !== car).map(q => ({ q, sc: (car.y - q.y) * .5 + Math.min(laneOpen(q.x, q.y), 4) * 2 + Math.min(nearOpp(q.x, q.y, 0), 6) - Math.hypot(q.x - car.x, q.y - car.y) * .08 + (wide && q.y < 16 && Math.abs(q.x - 34) < 12 ? 6 : 0) })).sort((a, b) => b.sc - a.sc);
+    const pPass = sty === 'playmaker' || sty === 'crosser' && wide ? .8 : sty === 'dribbler' ? .35 : .55;
+    if (opts.length && opts[0].sc > 1 && R() < pPass) aiPass(car, opts[0].q, wide && sty !== 'inverted');
+  }
+  function aiPass(car, to, cross) {
+    const m = mom, tx = to.x + (to.run ? (to.run.x - to.x) * .3 : 0), ty = to.y - 1.5, d = Math.hypot(tx - ball.x, ty - ball.y);
+    const err = (100 - car.pf.at.pas) / 12 * Math.PI / 180 * FBX.n(), ang = Math.atan2(ty - ball.y, tx - ball.x) + err;
+    const v = cross ? clamp(d * .75 + 6, 12, 22) : clamp(d * 1.05 + 7, 9, 22), vz = cross ? 6.5 : d > 22 ? 3 : 0;
+    car.face = ang; car.kick = .28; ball.own = null; ball.phys = true; ball.vx = Math.cos(ang) * v; ball.vy = Math.sin(ang) * v; ball.vz = vz; ball.side = ball.bs = 0;
+    m.fol.last = car; m.fol.n++; m.recv = null; m.recvDone = false; m.shooting = false; m.passer = null; m.target = null; m.phase = 'flight'; m.ft = 0;
+    m.defs.forEach(q => q.missed = false); FBA.play('pass');
+    if (cross) feed(`↗ ${mm()}' ${FBU.esc(car.short)} ortayı yaptı`, 'mut');
+    planReceive();
   }
   // Finishing quality: a developed striker places and strikes shots that keepers handle worse
   const finishQ = () => FBX.finish(A, !!(mom && (mom.type === 'fk' || Math.abs(ball.side) > .25)));
@@ -770,7 +895,9 @@ function FBMatch(host, o) {
       if (dd < reach && b.z < top) {
         const low = b.z < .3 && sp > 17 ? .1 : 0, high = b.z > 1.6 ? .08 : 0;
         const pc = clamp(.86 - Math.max(0, sp - 19) / 50 - Math.pow(dd / reach, 2) * .45 + g.sk * .12 - low - high - (mom.type === 'pen' ? .18 : 0) - finishQ() - clamp((19 - (mom.kickDist || 20)) / 19, 0, 1) * .4, .08, .92) * (TUT ? .5 : 1);   // little time to react from close range
-        if (R() < pc) {
+        const body = !TUT && dd < .3 && b.z < 1.5 && !g.dived;   // ball straight at him: it cannot pass through his body
+        if (!mom.shooting && !mom.passer && dd < reach * .8 && b.z < top && sp < 26) { FBA.play('save', true); pop('🧤 Kaleci araya girdi', '#9fe7ff'); g.face = Math.atan2(b.y - g.y, b.x - g.x); attach(g); endMoment(mom.passer ? 'pass' : 'passfail'); return; }
+        if (body || R() < pc) {
           const caught = sp < 20 && !g.dived;
           FBA.play('save', caught); FBA.buzz(20); pop(caught ? '🧤 Kaleci kucakladı' : '🧤 Müthiş kurtarış!', '#9fe7ff');
           if (caught) { g.face = Math.atan2(b.y - g.y, b.x - g.x); attach(g); } else { b.vy = Math.abs(b.vy) * .3; b.vx = Math.sign(b.x - g.x || 1) * (5 + R() * 6); b.vz = 2; }
@@ -781,16 +908,24 @@ function FBMatch(host, o) {
     for (const p of mom.defs) {
       const h = p.wall ? (p.jump ? 1.98 : 1.8) : 1.8;
       if (b.z < h && !(p.stun > 0) && !p.missed && Math.hypot(b.x - p.x, b.y - p.y) < (p.wall ? .55 : .62)) {
-        if (!p.wall && R() < .45) { p.missed = true; continue; }   // ball squeezes past / through his legs
+        if (!p.wall && b.z < .35 && R() < .22) { p.missed = true; continue; }   // a low ball can squeeze through his legs (nutmeg)
         if (sp > 24 && R() < .5 && !p.wall) { b.vx = -b.vx * .3 + (R() - .5) * 8; b.vy = -b.vy * .3; FBA.play('tackle'); pop('🛡️ Araya girdi', '#fca5a5'); endMoment(mom.shooting ? 'blocked' : 'passfail'); return; }
         FBA.play('tackle'); pop(p.wall ? '🧱 Baraja çarptı' : '🛡️ Rakip kesti', '#fca5a5');
         if (p.wall) { b.vx *= -.25; b.vy *= -.25; b.vz = 0; } else { p.face = Math.atan2(b.y - p.y, b.x - p.x); attach(p); }
         endMoment(mom.shooting ? 'blocked' : 'passfail'); return;
       }
     }
+    // A shot that runs into a teammate: soft enough → he takes it, hard → it ricochets off him (never through him)
+    if (mom.shooting && !mom.passer && !mom.recv) for (const p of mom.mates) {
+      if (b.z < 1.8 && Math.hypot(b.x - p.x, b.y - p.y) < .45 && mom.ft > .08) {
+        if (sp < 19) { mom.shooting = false; mom.recv = p; p.lane = null; p.face = Math.atan2(b.y - p.y, b.x - p.x); attach(p); p.ctrl = .25; FBA.play('touch'); return; }
+        const nx = (b.x - p.x) || .01, ny = (b.y - p.y) || .01, nl = Math.hypot(nx, ny); b.vx = nx / nl * sp * .35 + (R() - .5) * 3; b.vy = ny / nl * sp * .35; b.vz = Math.max(b.vz, 1); FBA.play('tackle'); pop('Arkadaşına çarptı', '#ddd'); endMoment('blocked'); return;
+      }
+    }
     // A teammate reaching the ball gets it under control (no teleport: he steps onto it)
     if (!mom.passer && !mom.recv && !mom.shooting) for (const p of mom.mates) {
-      if (b.z < 1.9 && sp < 31 && Math.hypot(b.x - p.x, b.y - p.y) < (mom.target === p ? .9 : 1.1) * (TUT ? 1.8 : 1)) { mom.recv = p; p.lane = null; p.face = Math.atan2(b.y - p.y, b.x - p.x); attach(p); p.ctrl = .25; FBA.play('touch'); return; }
+      if (mom.fol && p === mom.fol.last && mom.ft < .35) continue;   // the passer does not collect his own pass
+      if (b.z < 1.9 && sp < 31 && Math.hypot(b.x - p.x, b.y - p.y) < (mom.target === p ? .9 : 1.1) * (TUT ? 1.3 : 1)) { mom.recv = p; p.lane = null; p.face = Math.atan2(b.y - p.y, b.x - p.x); attach(p); p.ctrl = .25; FBA.play('touch'); return; }
     }
   }
 
@@ -802,7 +937,107 @@ function FBMatch(host, o) {
     p.vx = lerp(p.vx, dx / l * s, Math.min(1, dt * 6)); p.vy = lerp(p.vy, dy / l * s, Math.min(1, dt * 6));
     p.x += p.vx * dt; p.y += p.vy * dt; p.ph += Math.hypot(p.vx, p.vy) * dt * 2.2; p.face = Math.atan2(p.vy, p.vx);
   }
+  /* ---------- Off-ball AI (both teams) while a moment is live ----------
+     Every player who is not part of the scene's script picks a spot from his role, his style, the ball, team-mates,
+     opponents and free space, re-thinking ~3 times a second. Attack (team 0): width, support, runs in behind and late
+     runs; defence (team 1): a compact line, goal-side marking, one man closing the most dangerous passing lane and one
+     covering the shot. Score and minute make the trailing side push up and the leading side drop deeper. */
+  const lastLine = () => Math.min(...T1.filter(p => p.role !== 'GK').map(p => p.y));
+  const nearOpp = (x, y, team) => Math.min(...(team ? T0 : T1).filter(p => p.role !== 'GK').map(q => Math.hypot(q.x - x, q.y - y)));
+  function segD(px, py, ax, ay, bx, by) { const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1, t = clamp(((px - ax) * dx + (py - ay) * dy) / l2, 0, 1); return Math.hypot(px - ax - dx * t, py - ay - dy * t); }
+  function laneOpen(x, y) { const bx = ball.x, by = ball.y; let m = 9; for (const q of T1) if (q.role !== 'GK') m = Math.min(m, segD(q.x, q.y, bx, by, x, y)); return m; }
+  const chase = () => { const d = st.sc[0] - st.sc[1]; return st.min > 65 ? clamp(-d, -1, 1) : 0; };   // +1: we are behind late on
+  function attackAnchor(p, bx, by, line) {
+    const g = p.pf.g, side = p.role[0] === 'L' ? -1 : p.role[0] === 'R' ? 1 : (p.x < 34 ? -1 : 1), sty = p.pf.style, push = chase() * 4, ai = p.ai;
+    const deep = by > 60;   // building from the back
+    switch (g) {
+      case 'CB': return [34 + side * (sty === 'ballplayer' ? 12 : 9), clamp(by + 24 - push, 40, 96)];
+      case 'FB': { const ov = sty === 'overlap' && Math.sign(bx - 34) === side; return [34 + side * 28, clamp(ov ? by - 5 : by + 9 - push, 18, 92)]; }
+      case 'CM': {
+        if (sty === 'b2b' && by < 40 && ai.late) return [34 + side * 4, clamp(line + 3, 9, 30)];   // late run into the box
+        if (sty === 'anchor') return [34 + (bx - 34) * .3, clamp(by + 13, 20, 85)];
+        return [clamp(bx + side * 11, 10, 58), clamp(by + (sty === 'playmaker' ? 9 : 5) - push, 14, 88)];
+      }
+      case 'W': {
+        if (ai.behind) return [34 + side * 14, clamp(line - 5, 4, 60)];
+        const inv = sty === 'inverted' && by < 45; return [34 + side * (inv ? 15 : 28), clamp(Math.min(by - 6, line + 1) - push, 6, 70)];
+      }
+      case 'ST': {
+        if (ai.behind) return [clamp(34 + (bx - 34) * .3 + (ai.side || 2), 26, 42), clamp(line - 6, 3, 60)];
+        if (sty === 'target' || ai.drop) return [34 + (bx - 34) * .25, clamp(by - 6, line + 2, 80)];   // checking back to the ball
+        return [34 + (bx - 34) * .2 + (ai.side || 0), clamp(line + 1, 6, 70)];
+      }
+    }
+    return formTarget(p, bx, by, 0);
+  }
+  // Best spot near the anchor: free of markers, an open lane from the ball, apart from team-mates, not offside
+  function attackSpot(p, bx, by) {
+    const line = lastLine(), a = attackAnchor(p, bx, by, line), R2 = 5;
+    let best = a, bs = -1e9;
+    for (let k = 0; k < 9; k++) {
+      const ang = k * 2.4 + p.num, rr = k ? R2 * (.4 + (k % 3) * .3) : 0, x = clamp(a[0] + Math.cos(ang) * rr, 3, 65), y = clamp(a[1] + Math.sin(ang) * rr, 3, 100);
+      const free = Math.min(nearOpp(x, y, 0), 7), lane = Math.min(laneOpen(x, y), 4), spread = Math.min(...T0.filter(q => q !== p && q.role !== 'GK').map(q => Math.hypot(q.x - x, q.y - y)), 9);
+      const off = y < line - .5 && !p.ai.behind ? 6 : 0;
+      const sc = free * .8 + lane * 1.1 + spread * .45 - Math.hypot(x - a[0], y - a[1]) * .35 - off;
+      if (sc > bs) { bs = sc; best = [x, y]; }
+    }
+    return best;
+  }
+  // Defending block for team 1: line height from the ball, goal-side marking, plus lane and shot cover jobs
+  function defendSpots() {
+    const bx = ball.x, by = ball.y, lead = -chase(), lineY = clamp(by * .55 - lead * 3, 6, 34), jobs = new Map();
+    const free = T1.filter(p => p.role !== 'GK' && !(mom && ((mom.defs.includes(p) && !mom.fol) || mom.car === p)) && !p.lane);
+    // shot cover: the free defender closest to the ball-goal line stands on it
+    if (by < 32) { const sx = bx + (34 - bx) * .25, sy = by * .75; const c = free.slice().sort((a, b) => Math.hypot(a.x - sx, a.y - sy) - Math.hypot(b.x - sx, b.y - sy))[0]; if (c) jobs.set(c, [sx, sy]); }
+    // lane cover: the most dangerous open receiver gets a man on the lane
+    const tgt = T0.filter(q => q.role !== 'GK' && q !== ball.own).map(q => ({ q, d: q.y + laneOpen(q.x, q.y) * -4 })).sort((a, b) => a.d - b.d)[0];
+    if (tgt) { const lx = lerp(bx, tgt.q.x, .55), ly = lerp(by, tgt.q.y, .55), c = free.filter(p => !jobs.has(p)).sort((a, b) => Math.hypot(a.x - lx, a.y - ly) - Math.hypot(b.x - lx, b.y - ly))[0]; if (c) jobs.set(c, [lx, ly]); }
+    free.forEach(p => {
+      if (jobs.has(p)) return;
+      const g = p.pf.g, a = anchor(p);
+      let x = a[0] + (bx - 34) * .35, y = g === 'CB' || g === 'FB' ? lineY + (g === 'FB' ? 1 : 0) : g === 'CM' ? lineY + 9 : lineY + 20;
+      // goal-side marking of the nearest attacker in his zone
+      const m = T0.filter(q => q.role !== 'GK').map(q => [q, Math.hypot(q.x - x, q.y - y)]).sort((u, v) => u[1] - v[1])[0];
+      if (m && m[1] < 9 && (g === 'CB' || g === 'FB' || p.pf.style === 'anchor')) { const q = m[0], gx = 34 - q.x, gy = -q.y, gl = Math.hypot(gx, gy) || 1; x = q.x + gx / gl * 1.4; y = q.y + gy / gl * 1.4; }
+      jobs.set(p, [clamp(x, 3, 65), clamp(y, 3, 100)]);
+    });
+    return jobs;
+  }
+  function teamAI(dt) {
+    if (!mom || mom.type === 'pen' || mom.type === 'fk' && mom.phase !== 'flight') return false;
+    if (mom.base === 'def' || mom.type === 'def') return false;   // defending scenes keep their own choreography
+    if ((st.aiT = (st.aiT || 0) - dt) <= 0) {
+      st.aiT = .33; const bx = ball.x, by = ball.y;
+      T0.forEach(p => {
+        if (p === me || p.role === 'GK') return;
+        const ai = p.ai || (p.ai = {});
+        // timed decisions: runs in behind (pace + style), dropping off, late box runs
+        if ((ai.t = (ai.t || 0) - .33) <= 0) {
+          ai.t = 1.2 + R() * 1.5; const pace = p.pf.at.hiz / 100;
+          ai.behind = (p.pf.g === 'ST' || p.pf.g === 'W') && by < 60 && R() < (p.pf.style === 'runner' ? .55 : .2) * (.6 + pace);
+          ai.drop = p.pf.g === 'ST' && !ai.behind && R() < (p.pf.style === 'target' ? .5 : .15);
+          ai.late = p.pf.style === 'b2b' && by < 42 && R() < .5;
+          ai.side = (R() - .5) * 8;
+        }
+        if (mom.mates.includes(p) && p.run && !ai.free && Math.hypot(p.run.x - p.x, p.run.y - p.y) > 1.5) return;   // scripted runner finishes his first run
+        if (mom.mates.includes(p)) ai.free = true;
+        ai.spot = attackSpot(p, bx, by);
+        if (mom.mates.includes(p)) p.run = { x: ai.spot[0], y: ai.spot[1] };
+      });
+      st.defJobs = defendSpots();
+    }
+    for (const p of ALL) {
+      if (p.lane || p === ball.own || p === me || p.role === 'GK' || p.keep) continue;
+      if ((mom.defs.includes(p) && !mom.fol) || mom.mates.includes(p) || mom.recv === p || (mom.car === p && !mom.res)) continue;
+      const t = p.team ? st.defJobs && st.defJobs.get(p) : p.ai && p.ai.spot;
+      if (!t) continue;
+      const v = (p.team ? 3.4 : 3.8) + (p.pf.at.hiz - 60) * .02 + (p.team === 0 && p.ai.behind ? 1.4 : 0);
+      moveTo(p, t[0], t[1], v, dt, .6);
+    }
+    return true;
+  }
   function idleAI(dt) {
+    if (teamAI(dt)) { GKs(dt); return; }
     if (mom && mom.type === 'pen') return;   // penalty: everyone waits outside the box
     for (const p of ALL) {
       if (p.lane || p === ball.own || p === me || p === GK1 || p.keep || (mom && (mom.defs.includes(p) || mom.mates.includes(p) || mom.recv === p || (mom.car === p && !mom.res) || (mom.runners && mom.runners.includes(p) && !mom.res)))) continue;
@@ -812,6 +1047,8 @@ function FBMatch(host, o) {
       moveTo(p, t[0], t[1], 3.2, dt, .9);
     }
   }
+  // Keepers keep their formation spot while the off-ball AI runs (the scene logic moves GK1 when it matters)
+  function GKs(dt) { [GK0].forEach(p => { if (p === ball.own || p.lane) return; const t = formTarget(p, ball.x, ball.y); moveTo(p, t[0], t[1], 3, dt, .9); }); }
   function lanesStep(dt) {
     for (const p of ALL) {
       const L = p.lane; if (!L) continue;
@@ -830,7 +1067,7 @@ function FBMatch(host, o) {
     else if (ball.own) {
       // Ball sits on the owner's foot; owner turns smoothly so the ball never jumps
       const p = ball.own, tx = p.x + Math.cos(p.face) * FOOT, ty = p.y + Math.sin(p.face) * FOOT, k = Math.min(1, dt * 16);
-      ball.x += (tx - ball.x) * k; ball.y += (ty - ball.y) * k; ball.z = 0;
+      ball.x += (tx - ball.x) * k; ball.y += (ty - ball.y) * k; ball.z = mom && mom.air && p === me && !mom.res ? 1.5 : 0;
     }
     // Debug guard: count frames where the ball moves further than physically possible
     const mv = Math.hypot(ball.x - bx, ball.y - by), lim = (f ? Math.hypot(f.x1 - f.x0, f.y1 - f.y0) / f.dur : Math.max(40, Math.hypot(ball.vx, ball.vy))) * dt * 1.6 + .25;
@@ -845,7 +1082,7 @@ function FBMatch(host, o) {
     banner(`<b>${scorer.user ? 'GOOOL!' : 'GOL!'}</b>${dist ? `<em class="fbm-dist">${dist} METREDEN</em>` : ''}<span>${FBU.esc(scorer.name)} ${mm()}'${assister ? ` · asist ${FBU.esc(assister.short)}` : ''}</span>`, 2800);
     if (window.JUICE) JUICE.confetti();
     st.mode = 'celebrate'; st.modeT = 3.2; st.celeb = { p: scorer, corner: { x: scorer.x < 34 ? 3 : 65, y: 3 } };
-    st.crowdJump = 3.5; FBA.crowdLevel(1); live();
+    st.crowdJump = 3.5; crowdLv(1); live();
   }
   /* ---------- Tutorial: four short lessons, each must be passed before the next ---------- */
   const TUT_STEPS = [
@@ -873,11 +1110,27 @@ function FBMatch(host, o) {
     tutCard('Tekrar dene', { t: s.t, d: `<i>${(s.why && s.why[res]) || 'Bir daha dene, olacak!'}</i><br><br>${s.d}` }, `<button class="fbm-btn pri" data-a="tgo">Tekrar dene ↻</button>`);
   }
   let lastMiss = null;
+  // A free ball after a moment is a real loose ball: the nearest players of both teams go for it and the first to reach
+  // it takes it. Possession only changes through contact, so a failed pass is never handed back by a jump cut.
+  const looseBall = () => !ball.own && !ball.fl && !ball.inNet && ball.x > -.5 && ball.x < PW + .5 && ball.y > -.5 && ball.y < PL;
+  function looseStep(dt) {
+    if (!looseBall()) { st.looseT = 0; return; }
+    st.looseT = (st.looseT || 0) + dt;
+    const cands = ALL.filter(p => p !== me && !(p.stun > 0) && (p.role !== 'GK' || Math.hypot(ball.x - p.x, ball.y - p.y) < 9));
+    for (const side of [0, 1]) {
+      const near = cands.filter(p => p.team === side).sort((a, b) => Math.hypot(a.x - ball.x, a.y - ball.y) - Math.hypot(b.x - ball.x, b.y - ball.y)).slice(0, 2);
+      near.forEach(p => { p.lane = null; const t = Math.min(.6, Math.hypot(p.x - ball.x, p.y - ball.y) / 7); moveTo(p, ball.x + ball.vx * t * .5, ball.y + ball.vy * t * .5, 6.8, dt, .1); });
+    }
+    if (ball.z > 1.2) return;
+    let best = null, bd = .65;
+    for (const p of cands) { const d = Math.hypot(p.x - ball.x, p.y - ball.y); if (d < bd) { bd = d; best = p; } }
+    if (best) { best.face = Math.atan2(ball.y - best.y, ball.x - best.x); attach(best); best.ctrl = .25; FBA.play('touch'); feed(`${best.team ? '🔴' : '🔵'} ${mm()}' Boştaki topu ${FBU.esc(best.short)} aldı`, 'mut'); }
+  }
   function toTicker() {
     if (TUT) { const r = mom && mom.res; lastMiss = mom && mom.missBy != null ? mom.missBy : null; mom = null; momEl.hidden = true; shotEl.hidden = true; c3.tk = c3.k = 0; me.keep = false; st.kickT = null; st.script = null; resetActors(); ball.phys = false; ball.fl = null; return tutAfter(r); }
     mom = null; momEl.hidden = true; shotEl.hidden = true; c3.tk = c3.k = 0; me.keep = false; st.kickT = null; st.script = null; st.mode = 'tick'; st.hold = .35; resetActors(); ball.phys = false; ball.fl = null;
     if (!ball.own) attach(GK1);
-    showTicker(true); FBA.crowdLevel(.25);
+    showTicker(true); crowdLv(.25);
   }
 
   /* ---------- Camera & rendering ---------- */
@@ -916,17 +1169,37 @@ function FBMatch(host, o) {
     const cheer = st.crowdJump > 0, pat = cheer && Math.sin(perf * 18) > -.2 ? crowdB : crowdA, j = cheer ? Math.abs(Math.sin(perf * 11)) * -2.5 * Math.min(1, st.crowdJump) : 0;
     cx.save(); cx.translate(((ox % CT_W) + CT_W) % CT_W - CT_W, ((oy % CT_H) + CT_H) % CT_H - CT_H + j); cx.fillStyle = pat; cx.fillRect(0, 0, W + CT_W * 2, H + CT_H * 2); cx.restore();
   }
+  /* ---------- Venue identity: every home ground has its own grass, mowing pattern and colours; big games are louder ---------- */
+  const VEN = (() => {
+    const r = FBU.rng('venue' + homeT.id), G = [['#2f8a3e', '#34963f'], ['#2b7f3a', '#33913f'], ['#318c41', '#2a7d38'], ['#2e8640', '#3a9c47'], ['#29763a', '#2f8541'], ['#33903f', '#2c8239']][(r() * 6) | 0];
+    const pat = ['h', 'h', 'v', 'c', 'h2'][(r() * 5) | 0], n = [14, 18, 22][(r() * 3) | 0];
+    return { g0: G[0], g1: G[1], pat, n, track: mix(homeT.c1, '#1f3a2a', .78), b1: homeT.c1, b2: homeT.c2 === homeT.c1 ? '#0f2a5c' : homeT.c2 };
+  })();
+  const CROWD_K = (o.big ? 1.25 : 1) * (o.derby ? 1.1 : 1);
+  function crowdLv(v) { FBA.crowdLevel(Math.min(1, v * CROWD_K)); }
+  // Original match-ball designs per league and European cup (base, panels, accent ring); same physics for all
+  const BALLS = { tr: ['#ffffff', '#d6182a', '#1b1b1b'], en: ['#ffffff', '#5b2a86', '#e4c547'], es: ['#ffffff', '#f2a900', '#c8102e'], it: ['#ffffff', '#1e5aa8', '#22a34a'], fr: ['#ffffff', '#1d3557', '#e63946'], de: ['#ffffff', '#111111', '#e30613'],
+    pt: ['#ffffff', '#046a38', '#da291c'], nl: ['#ffffff', '#f36c21', '#21468b'], be: ['#ffffff', '#111111', '#fdda24'], sc: ['#ffffff', '#005eb8', '#ffffff'], ru: ['#ffffff', '#0039a6', '#d52b1e'], gr: ['#ffffff', '#0d5eaf', '#7fb2e5'],
+    ucl: ['#f4f6fa', '#0b1f5c', '#9fb0d0'], uel: ['#ffffff', '#f07c00', '#1a1a1a'], uecl: ['#ffffff', '#0fa36b', '#1a1a1a'] };
+  const BALL = BALLS[o.ballKey] || ['#ffffff', '#222222', '#666666'];
+  // Grass with this venue's mowing pattern, drawn in world space so it follows the camera
+  function drawGrass(x0, y0, x1, y1, m) {
+    cx.fillStyle = VEN.g0; cx.fillRect(x0 - m, y0 - m, x1 - x0 + 2 * m, y1 - y0 + 2 * m); cx.fillStyle = VEN.g1;
+    const n = VEN.n;
+    if (VEN.pat === 'v') for (let k = 0; k < n; k += 2) { const [xa] = W2S(k * PW / n, 0), [xb] = W2S((k + 1) * PW / n, 0); cx.fillRect(xa, y0 - m, xb - xa, y1 - y0 + 2 * m); }
+    else if (VEN.pat === 'c') for (let i = 0; i < n; i++) for (let j = 0; j < 8; j++) { if ((i + j) % 2) continue; const [xa, ya] = W2S(j * PW / 8, i * PL / n), [xb, yb] = W2S((j + 1) * PW / 8, (i + 1) * PL / n); cx.fillRect(xa, ya, xb - xa, yb - ya); }
+    else for (let k = 0; k < n; k++) if (VEN.pat === 'h2' ? k % 3 === 0 : k % 2 === 0) { const [, ya] = W2S(0, k * PL / n), [, yb] = W2S(0, (k + 1) * PL / n); cx.fillRect(x0 - m, ya, x1 - x0 + 2 * m, yb - ya); }
+  }
   const W2S = (x, y) => [(x - cam.x) * cam.s + W / 2, (y - cam.y) * cam.s + H / 2];
   let perf = 0;
   function drawPitch() {
     const s = cam.s, [x0, y0] = W2S(0, 0), [x1, y1] = W2S(PW, PL);
     drawStands(x0 * .6, y0 * .6);
     // running track + advertising boards separate the stands from the pitch
-    const m = 4 * s; cx.fillStyle = '#1f3a2a'; cx.fillRect(x0 - 6 * s, y0 - 6 * s, x1 - x0 + 12 * s, y1 - y0 + 12 * s);
-    cx.lineWidth = .9 * s; cx.strokeStyle = '#0f2a5c'; cx.strokeRect(x0 - 5 * s, y0 - 5 * s, x1 - x0 + 10 * s, y1 - y0 + 10 * s);
+    const m = 4 * s; cx.fillStyle = VEN.track; cx.fillRect(x0 - 6 * s, y0 - 6 * s, x1 - x0 + 12 * s, y1 - y0 + 12 * s);
+    cx.lineWidth = .9 * s; cx.strokeStyle = VEN.b2; cx.strokeRect(x0 - 5 * s, y0 - 5 * s, x1 - x0 + 10 * s, y1 - y0 + 10 * s);
     cx.setLineDash([5 * s, 7 * s]); cx.strokeStyle = homeT.c1; cx.strokeRect(x0 - 5 * s, y0 - 5 * s, x1 - x0 + 10 * s, y1 - y0 + 10 * s); cx.setLineDash([]);
-    cx.fillStyle = '#2f8a3e'; cx.fillRect(x0 - m, y0 - m, x1 - x0 + 2 * m, y1 - y0 + 2 * m);
-    for (let k = 0; k < 18; k++) if (k % 2 === 0) { const [, ya] = W2S(0, k * PL / 18), [, yb] = W2S(0, (k + 1) * PL / 18); cx.fillStyle = '#34963f'; cx.fillRect(x0 - m, ya, x1 - x0 + 2 * m, yb - ya); }
+    drawGrass(x0, y0, x1, y1, m);
     cx.strokeStyle = 'rgba(255,255,255,.85)'; cx.lineWidth = Math.max(1.5, .12 * s);
     const L = (ax, ay, bx, by) => { const [a, b] = W2S(ax, ay), [c, d] = W2S(bx, by); cx.beginPath(); cx.moveTo(a, b); cx.lineTo(c, d); cx.stroke(); };
     const Rr = (ax, ay, w, h) => { const [a, b] = W2S(ax, ay); cx.strokeRect(a, b, w * s, h * s); };
@@ -983,9 +1256,9 @@ function FBMatch(host, o) {
     const s = cam.s, [x, y] = W2S(ball.x, ball.y), r = Math.max(3, .24 * s) * (1 + ball.z * .06);
     cx.fillStyle = 'rgba(0,0,0,.35)'; cx.beginPath(); cx.ellipse(x + ball.z * .25 * s, y + .1 * s, r * .9, r * .5, 0, 0, 7); cx.fill();
     const by = y - ball.z * s * .9;
-    cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(x, by, r, 0, 7); cx.fill(); cx.strokeStyle = '#222'; cx.lineWidth = 1; cx.stroke();
+    cx.fillStyle = BALL[0]; cx.beginPath(); cx.arc(x, by, r, 0, 7); cx.fill(); cx.strokeStyle = BALL[2]; cx.lineWidth = Math.max(1, r * .16); cx.stroke();
     const own = ball.own; ball.spin += (Math.hypot(ball.vx, ball.vy) + (ball.fl ? 15 : own ? Math.hypot(own.vx, own.vy) + (own.lane ? 6 : 0) : 0)) * .016;
-    cx.fillStyle = '#222'; for (let k = 0; k < 3; k++) { const a = ball.spin + k * 2.1; cx.beginPath(); cx.arc(x + Math.cos(a) * r * .5, by + Math.sin(a) * r * .5, r * .28, 0, 7); cx.fill(); }
+    cx.fillStyle = BALL[1]; for (let k = 0; k < 3; k++) { const a = ball.spin + k * 2.1; cx.beginPath(); cx.arc(x + Math.cos(a) * r * .5, by + Math.sin(a) * r * .5, r * .28, 0, 7); cx.fill(); }
   }
   function label(t, x, y, col) { cx.font = 'bold 13px system-ui,sans-serif'; const w = cx.measureText(t).width + 12; cx.fillStyle = 'rgba(0,0,0,.65)'; cx.fillRect(x - w / 2, y - 10, w, 20); cx.fillStyle = col; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText(t, x, y); }
   // Pull-back aim: the ball goes opposite to the finger; shows rubber band, direction arrow and centre-contact path
@@ -1033,7 +1306,7 @@ function FBMatch(host, o) {
     cx.strokeStyle = 'rgba(255,255,255,.55)'; cx.lineWidth = 2; cx.setLineDash([4, 5]); cx.beginPath(); cx.moveTo(bx, by); cx.lineTo(bx + dx, by + dy); cx.stroke(); cx.setLineDash([]);
     cx.fillStyle = 'rgba(255,255,255,.8)'; cx.beginPath(); cx.arc(bx + dx, by + dy, 7, 0, 7); cx.fill();
     if (!ok) { label('Daha fazla çek', bx, by - 34, '#fca5a5'); return; }
-    const col = pw < .5 ? '#86efac' : pw < .8 ? '#fde047' : '#f87171', v = kickVec(ang, pw, 0, 0, false), shotNow = isShot(simPath(v, ball.x, ball.y, 2.2, 1 / 30));
+    const col = pw < .5 ? '#86efac' : pw < .8 ? '#fde047' : '#f87171', v = kickVec(ang, pw, 0, 0, false), pv0 = simPath(v, ball.x, ball.y, 2.2, 1 / 30), lm = laneMate(pv0), shotNow = isShot(pv0) && !lm;
     // The guide is a help, not a prophecy: it wobbles with the player's inaccuracy and only shows the first part of the
     // flight. Şut (Pas for passes) sets how far you can "read" the ball; the chosen power stretches that reach.
     const sigD = kickSig(pw, 0, shotNow), wob = sigD * .6 * (Math.sin(perf * 2.3) + .6 * Math.sin(perf * 3.7 + 1)) * Math.PI / 180;
@@ -1047,6 +1320,7 @@ function FBMatch(host, o) {
     cx.fillStyle = col;
     path.forEach((q, i) => { if (i % 2) return; const [px, py] = W2S(q.x, q.y); cx.globalAlpha = Math.max(.08, 1 - i / Math.max(1, path.length)); cx.beginPath(); cx.arc(px, py - q.z * cam.s * .9, 3, 0, 7); cx.fill(); });
     cx.globalAlpha = 1;
+    if (mom.type !== 'pen' && mom.type !== 'fk') label(shotNow ? 'ŞUT' : lm ? `PAS → ${lm.short}` : 'PAS', bx, by - 34, shotNow ? '#fca5a5' : '#86efac');   // the kick's meaning is shown before release
     // direction arrow
     const L = 34 + pw * 70, ax = bx + Math.cos(ang) * L, ay = by + Math.sin(ang) * L;
     cx.strokeStyle = col; cx.lineWidth = 6; cx.lineCap = 'round'; cx.beginPath(); cx.moveTo(bx + Math.cos(ang) * 14, by + Math.sin(ang) * 14); cx.lineTo(ax, ay); cx.stroke();
@@ -1116,10 +1390,11 @@ function FBMatch(host, o) {
   function render3D() {
     const C = cam3();
     drawStands(-C.p[0] * 6, 0);
-    poly3(C, [[-6, -6, 0], [PW + 6, -6, 0], [PW + 6, PL + 6, 0], [-6, PL + 6, 0]], '#2f8a3e');
-    for (let k = 0; k < 18; k += 2) poly3(C, [[-6, k * PL / 18, 0], [PW + 6, k * PL / 18, 0], [PW + 6, (k + 1) * PL / 18, 0], [-6, (k + 1) * PL / 18, 0]], '#34963f');
+    poly3(C, [[-6, -6, 0], [PW + 6, -6, 0], [PW + 6, PL + 6, 0], [-6, PL + 6, 0]], VEN.g0);
+    if (VEN.pat === 'v') for (let k = 0; k < VEN.n; k += 2) poly3(C, [[k * PW / VEN.n, -6, 0], [(k + 1) * PW / VEN.n, -6, 0], [(k + 1) * PW / VEN.n, PL + 6, 0], [k * PW / VEN.n, PL + 6, 0]], VEN.g1);
+    else for (let k = 0; k < VEN.n; k += 2) poly3(C, [[-6, k * PL / VEN.n, 0], [PW + 6, k * PL / VEN.n, 0], [PW + 6, (k + 1) * PL / VEN.n, 0], [-6, (k + 1) * PL / VEN.n, 0]], VEN.g1);
     const boards = [[[-3, -4], [PW + 3, -4]], [[PW + 3, -4], [PW + 3, PL + 4]], [[PW + 3, PL + 4], [-3, PL + 4]], [[-3, PL + 4], [-3, -4]]];
-    boards.forEach(([a, b], i) => poly3(C, [[a[0], a[1], 0], [b[0], b[1], 0], [b[0], b[1], 1], [a[0], a[1], 1]], i % 2 ? homeT.c1 : '#0f2a5c'));
+    boards.forEach(([a, b], i) => poly3(C, [[a[0], a[1], 0], [b[0], b[1], 0], [b[0], b[1], 1], [a[0], a[1], 1]], i % 2 ? VEN.b1 : VEN.b2));
     cx.strokeStyle = 'rgba(255,255,255,.85)';
     const L3 = (a, b, c, d) => seg3(C, [a, b, 0], [c, d, 0]);
     L3(0, 0, PW, 0); L3(PW, 0, PW, PL); L3(PW, PL, 0, PL); L3(0, PL, 0, 0); L3(0, PL / 2, PW, PL / 2);
@@ -1143,7 +1418,7 @@ function FBMatch(host, o) {
       if (it.p) { if (it.p.user) { const g = P3(C, it.p.x, it.p.y, 0); if (g) { const w = .7 / g[2] * C.F; cx.strokeStyle = '#ffd400'; cx.lineWidth = 2; cx.beginPath(); cx.ellipse(g[0], g[1], w, w * (.25 + .75 * Math.abs(C.f[2])), 0, 0, 7); cx.stroke(); } } cx.globalAlpha = xray && it.d < bd + .3 ? .28 : 1; drawPlayer3(C, it.p); cx.globalAlpha = 1; return; }
       const sh = P3(C, ball.x, ball.y, 0), bp = P3(C, ball.x, ball.y, ball.z + .11);
       if (sh) { const w = .12 / sh[2] * C.F; cx.fillStyle = 'rgba(0,0,0,.35)'; cx.beginPath(); cx.ellipse(sh[0], sh[1], w, w * (.3 + .7 * Math.abs(C.f[2])), 0, 0, 7); cx.fill(); }
-      if (bp) { const r = Math.max(2.5, .11 / bp[2] * C.F); cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(bp[0], bp[1], r, 0, 7); cx.fill(); cx.strokeStyle = '#222'; cx.lineWidth = Math.max(1, r * .08); cx.stroke(); cx.fillStyle = '#222'; for (let k = 0; k < 3; k++) { const a = ball.spin + k * 2.1; cx.beginPath(); cx.arc(bp[0] + Math.cos(a) * r * .5, bp[1] + Math.sin(a) * r * .5, r * .28, 0, 7); cx.fill(); } }
+      if (bp) { const r = Math.max(2.5, .11 / bp[2] * C.F); cx.fillStyle = BALL[0]; cx.beginPath(); cx.arc(bp[0], bp[1], r, 0, 7); cx.fill(); cx.strokeStyle = BALL[1]; cx.lineWidth = Math.max(1, r * .08); cx.stroke(); cx.fillStyle = BALL[1]; for (let k = 0; k < 3; k++) { const a = ball.spin + k * 2.1; cx.beginPath(); cx.arc(bp[0] + Math.cos(a) * r * .5, bp[1] + Math.sin(a) * r * .5, r * .28, 0, 7); cx.fill(); } }
     });
     // live trajectory preview while choosing the contact point
     if (mom && mom.phase === 'contact' && c3.k > .9) {
@@ -1171,8 +1446,8 @@ function FBMatch(host, o) {
     else if (ctl && mom.phase === 'drive') { ts = base * 1.45; T = .45; const pv = cam.pv || (cam.pv = { x: me.x, y: me.y }), k = dt > 0 ? 1 / dt : 0; cam.lv = { x: lerp((cam.lv || {}).x || 0, (me.x - pv.x) * k, .1), y: lerp((cam.lv || {}).y || 0, (me.y - pv.y) * k, .1) }; fx = me.x + cam.lv.x * T; fy = me.y + cam.lv.y * T; }
     else if (ctl && (mom.phase === 'setup' || mom.phase === 'aim')) { ts = base * 1.6; fx = me.x; fy = me.y; T = .35; }
     // after a pass: a wider bird's-eye view that follows the ball and the teammate taking it, for the flight and ~2 s after
-    const passCam = mom && mom.kickM != null && !mom.shooting && !mom.passer && (mom.phase === 'flight' || st.mode === 'after');
-    if (passCam) { const tg = mom.recv || (mom.target && mom.target.team === 0 ? mom.target : null); ts = base * .85; fx = tg ? (ball.x + tg.x) / 2 : ball.x; fy = tg ? (ball.y + tg.y) / 2 : ball.y; frame = .05; T = .55; }
+    const passCam = mom && ((mom.kickM != null && !mom.shooting && !mom.passer && (mom.phase === 'flight' || st.mode === 'after')) || (mom.fol && !mom.res));
+    if (passCam) { const tg = (ball.own && ball.own.team === 0 && ball.own !== me ? ball.own : null) || mom.recv || (mom.target && mom.target.team === 0 ? mom.target : null); ts = base * .85; fx = tg ? (ball.x + tg.x) / 2 : ball.x; fy = tg ? (ball.y + tg.y) / 2 : ball.y; frame = .05; T = .55; }
     if (st.mode === 'celebrate' && st.celeb) { fx = st.celeb.p.x; fy = st.celeb.p.y; ts = base * 1.3; frame = 0; }
     if (!(ctl && mom.phase === 'drive')) cam.lv = null; cam.pv = { x: me.x, y: me.y };   // drive look-ahead state
     let tx = fx, ty = fy - frame * H / ts;
@@ -1208,7 +1483,8 @@ function FBMatch(host, o) {
       case 'scene': scriptStep(dt); if (mom) stepMoment(dt); idleAI(dt); break;
       case 'moment': stepMoment(dt); idleAI(dt); break;
       case 'after': if (mom) stepMoment(dt); idleAI(dt); if (mom && mom.recv && ball.own === mom.recv && !mom.passer) { const q = mom.recv; moveTo(q, q.x + (34 - q.x) * .05, q.y - 3, 4.2, dt, .2); }   // the teammate carries on with the ball
-        if ((st.afterT -= dt) <= 0 && c3.k === 0) toTicker(); break;
+        looseStep(dt);
+        if ((st.afterT -= dt) <= 0 && c3.k === 0 && (!looseBall() || (st.looseT || 0) > 4)) toTicker(); break;
       case 'celebrate': {
         const c = st.celeb, cs = c.p;
         cs.lane = null; moveTo(cs, c.corner.x, c.corner.y, 6.5, dt, 1); cs.st = 'celebrate';
@@ -1223,11 +1499,11 @@ function FBMatch(host, o) {
   function halftime() {
     st.half = 2; st.mode = 'half'; FBA.play('whistle', 'long'); feed(`⏸ 45' İlk yarı sona erdi`, 'mut'); live();
     showCard(`<div class="fbm-h">Devre arası</div>${scoreLine()}<p>⭐ Reytingin ${st.rating.toFixed(1)} · ${st.us.g} gol · ${st.us.a} asist</p><button class="fbm-btn pri" data-a="h2">2. Yarı ▶</button>`);
-    FBA.crowdLevel(.15);
+    crowdLv(.15);
   }
   function scoreLine() { const h = o.home ? st.sc[0] : st.sc[1], a = o.home ? st.sc[1] : st.sc[0]; return `<div class="fbm-fs">${FBT.badge(homeT, 30)}<b>${h} - ${a}</b>${FBT.badge(awayT, 30)}</div><div class="fbm-ev">${st.log.map(e => `<span>⚽ ${e.m}' ${FBU.esc(e.name)}${e.user ? ' ⭐' : ''}${e.d ? ` · ${e.d} m` : ''} <small>${FBU.esc((e.side ? o.opp : o.my).abbr)}</small></span>`).join('')}</div>`; }
   function fulltime() {
-    st.ended = true; showTicker(true); FBA.play('whistle', 'end'); FBA.crowdLevel(.2); refreshRating();
+    st.ended = true; showTicker(true); FBA.play('whistle', 'end'); crowdLv(.2); refreshRating();
     feed(`🏁 90' Maç sona erdi`, 'mut');
     showCard(`<div class="fbm-h">Maç sonu</div>${scoreLine()}<p>⭐ Reyting <b>${st.rating.toFixed(1)}</b> · ${st.us.g} gol · ${st.us.a} asist · ${st.us.sh} şut</p><button class="fbm-btn pri" data-a="end">Devam ▶</button>`);
     if (st.sc[0] > st.sc[1]) setTimeout(() => FBA.play('chant'), 600);
@@ -1253,7 +1529,7 @@ function FBMatch(host, o) {
   card.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return; FBA.play('ui');
     const a = b.dataset.a;
-    if (a === 'h2') { ovEl.hidden = true; st.mode = 'tick'; st.hold = .5; FBA.play('whistle', 'short'); feed(`▶ 46' İkinci yarı başladı`, 'mut'); FBA.crowdLevel(.3); }
+    if (a === 'h2') { ovEl.hidden = true; st.mode = 'tick'; st.hold = .5; FBA.play('whistle', 'short'); feed(`▶ 46' İkinci yarı başladı`, 'mut'); crowdLv(.3); }
     else if (a === 'end') { ovEl.hidden = true; finish(); }
     else if (a === 'res') { ovEl.hidden = true; st.paused = false; FBA.resume(); }
     else if (a === 'sim') { ovEl.hidden = true; st.paused = false; simRest(); }
@@ -1363,8 +1639,8 @@ function FBMatch(host, o) {
   function destroy() { dead = true; cancelAnimationFrame(raf); window.removeEventListener('resize', resize); if (window.visualViewport) visualViewport.removeEventListener('resize', resize); FBA.stopCrowd(); }
   window.addEventListener('resize', resize); if (window.visualViewport) visualViewport.addEventListener('resize', resize);   // iOS toolbars / rotation
   resize(); scoreUI(); refreshRating(); attach(T0.find(p => p.role === 'ST' && p !== me) || T0[6]);
-  if (TUT) { showTicker(false); FBA.crowdLevel(.12); tutCard('⚽ Antrenman sahası', TUT_STEPS[0], `<p class="fbm-tutn">5 kısa ders · her dersi geçince sıradakine geçersin</p><button class="fbm-btn pri" data-a="tgo">Başla ▶</button>`); }
-  else { feed(o.subIn ? `🔁 ${o.subIn}' Oyuna girdin! Skor ${st.sc[0]}-${st.sc[1]}` : o.resume ? `⏯ ${Math.floor(st.min)}. dakikadan devam ediliyor` : `▶ 1' Hakem başlama düdüğünü çaldı`, o.subIn ? 'me' : 'mut'); FBA.play('whistle', 'long'); FBA.crowdLevel(.3); }
+  if (TUT) { showTicker(false); crowdLv(.12); tutCard('⚽ Antrenman sahası', TUT_STEPS[0], `<p class="fbm-tutn">5 kısa ders · her dersi geçince sıradakine geçersin</p><button class="fbm-btn pri" data-a="tgo">Başla ▶</button>`); }
+  else { if (!o.resume && !o.subIn) feed(`🏟️ ${FBU.esc(homeT.name)} sahası${o.derby ? ' · DERBİ atmosferi!' : o.big ? ' · tribünler dolu' : ''} · maç topu: ${({ ucl: 'Şampiyonlar Kupası', uel: 'Avrupa Kupası', uecl: 'Konferans Kupası' })[o.ballKey] || 'lig'} topu`, 'mut'); feed(o.subIn ? `🔁 ${o.subIn}' Oyuna girdin! Skor ${st.sc[0]}-${st.sc[1]}` : o.resume ? `⏯ ${Math.floor(st.min)}. dakikadan devam ediliyor` : `▶ 1' Hakem başlama düdüğünü çaldı`, o.subIn ? 'me' : 'mut'); FBA.play('whistle', 'long'); crowdLv(.3); }
   raf = requestAnimationFrame(tick);
   return { _cam: cam, _wh: () => [W, H], _all: ALL, _zoom: zoom, _gk: GK1, _step: dt => update(dt), _c3: c3, _kv: kickVec, _sim: simPath, _setContact: (x, y) => setContact(x, y), _enterContact: enterContact, destroy, pause() { if (!st.ended && !st.paused) $('.fbm-pause').click(); }, _st: st, _simRest: simRest, get mom() { return mom; }, _kick: userKick, _me: me, _ball: ball, _enter: enterScene, _slide: slideTackle, _poke: pokeTackle, get tut() { return TUT; } };
 }

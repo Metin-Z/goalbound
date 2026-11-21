@@ -9,10 +9,10 @@ const FB_LEAGUES = [
   { id: 'tr', name: 'Süper Lig', country: 'Türkiye', flag: '🇹🇷', nat: 'tr', dom: .55, euro: [2, 2, 1], teams: [
     ['G.Saray', '', '#a90432', '#fdb912', 82], ['FenerB', '', '#14205c', '#f5d400', 81], ['B.Taş', '', '#111111', '#ffffff', 78],
     ['Trabzon Fırtına', '', '#7a1f3d', '#4fa3d9', 75], ['Başak İstanbul', '', '#f05a28', '#0b2240', 72], ['Samsun Kırmızı', '', '#e30613', '#ffffff', 72],
-    ['İzmir Göztaş', '', '#f6c400', '#d0021b', 71], ['Eyüp Sultan SK', '', '#6a1b9a', '#f6c400', 68], ['Haliç Paşa', '', '#1d3d8f', '#ffffff', 68],
+    ['İzmir Göztaş', '', '#f6c400', '#d0021b', 71], ['Eyüp Sultan SK', '', '#6a1b9a', '#f6c400', 68], ['Kasım Paşa', '', '#1d3d8f', '#ffffff', 68],
     ['Kocaeli Körfez', '', '#0a7a3b', '#111111', 67], ['Ankara Gençler', '', '#d0021b', '#111111', 66], ['Alanya Güneş', '', '#f47b20', '#0b8a3e', 68],
-    ['Konya Yeşilbeyaz', '', '#0a7a3b', '#ffffff', 67], ['Antep Şahinleri', '', '#c8102e', '#111111', 67], ['Rize Çay SK', '', '#0b8a3e', '#1d3d8f', 67],
-    ['Erzurum Dadaş', '', '#1d4f9e', '#ffffff', 64], ['Diyar Amed', '', '#0b8a3e', '#d0021b', 63], ['Çorum Leblebi FK', '', '#b5121b', '#111111', 63]] },
+    ['Konya Yeşilbeyaz', '', '#0a7a3b', '#ffffff', 67], ['Gazi Antep', '', '#c8102e', '#111111', 67], ['Rize Çay SK', '', '#0b8a3e', '#1d3d8f', 67],
+    ['Erzurum Dadaş', '', '#1d4f9e', '#ffffff', 64], ['Diyar Amed', '', '#0b8a3e', '#d0021b', 63], ['Çorum Hitit FK', '', '#b5121b', '#111111', 63]] },
   { id: 'en', name: 'Premier Division', country: 'İngiltere', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', nat: 'en', dom: .35, euro: [4, 2, 1], teams: [
     ['Arsenol', '', '#ef0107', '#ffffff', 89], ['Aston Vela', '', '#670e36', '#95bfe5', 82], ['Boremouth', '', '#da291c', '#111111', 76], ['Brentfort', '', '#e30613', '#ffffff', 76],
     ['Brightown', '', '#0057b8', '#ffffff', 79], ['Burnlee', '', '#6c1d45', '#99d6ea', 72], ['Chelsy', '', '#034694', '#ffffff', 86], ['Crystal Castle', '', '#1b458f', '#c4122e', 78],
@@ -22,30 +22,30 @@ const FB_LEAGUES = [
   { id: 'es', name: 'Primera División', country: 'İspanya', flag: '🇪🇸', nat: 'es', dom: .6, euro: [4, 2, 1], teams: [
     ['R.Madrid', '', '#f2f2f2', '#febe10', 91], ['Barsalona', '', '#a50044', '#004d98', 90], ['A.Madrid', '', '#cb3524', '#ffffff', 85], ['Bilbao Leones', '', '#ee2523', '#ffffff', 80],
     ['Villa Amarilla', '', '#ffe667', '#005187', 80], ['Betico Sevilla', '', '#00954c', '#ffffff', 79], ['Donostia Real', '', '#0067b1', '#ffffff', 78], ['Vigo Celestes', '', '#8ac3ee', '#ffffff', 75],
-    ['Sevila', '', '#f2f2f2', '#d6001c', 76], ['Valensia', '', '#f2f2f2', '#111111', 75], ['Pamplona Rojillos', '', '#d91a21', '#0a346f', 74], ['Getafé', '', '#005999', '#ffffff', 73],
+    ['Sevila', '', '#f2f2f2', '#d6001c', 76], ['Valensia', '', '#f2f2f2', '#111111', 75], ['Pamplona Osasun', '', '#d91a21', '#0a346f', 74], ['Getafé', '', '#005999', '#ffffff', 73],
     ['Jirona', '', '#cd2534', '#ffffff', 75], ['Vallecas Rayo', '', '#f2f2f2', '#e53027', 73], ['Españolo', '', '#007fc8', '#ffffff', 73], ['Majorca Islas', '', '#e20613', '#111111', 73],
-    ['Vitoria Babazorros', '', '#009ad7', '#ffffff', 72], ['Levanté', '', '#00519e', '#b4053f', 70], ['Elx Franjiverdes', '', '#f2f2f2', '#05642c', 70], ['Oviedo Carbayones', '', '#0057a5', '#ffffff', 69]] },
+    ['Vitoria Alavesa', '', '#009ad7', '#ffffff', 72], ['Levanté', '', '#00519e', '#b4053f', 70], ['Elche Franjiverde', '', '#f2f2f2', '#05642c', 70], ['Real Oviedano', '', '#0057a5', '#ffffff', 69]] },
   { id: 'it', name: 'Serie Uno', country: 'İtalya', flag: '🇮🇹', nat: 'it', dom: .45, euro: [4, 2, 1], teams: [
     ['Internazionali', '', '#0068a8', '#111111', 88], ['A.Milano', '', '#fb090b', '#111111', 85], ['Juventa', '', '#f2f2f2', '#111111', 85], ['Napule', '', '#12a0d7', '#ffffff', 86],
-    ['Bergamo Dea', '', '#1e71b8', '#111111', 83], ['Romulus', '', '#8e1f2f', '#f0bc42', 82], ['Aquile Roma', '', '#87d8f7', '#ffffff', 80], ['Fiorenza', '', '#482e92', '#ffffff', 79],
+    ['Bergamo Dea', '', '#1e71b8', '#111111', 83], ['Romulus', '', '#8e1f2f', '#f0bc42', 82], ['Lazia Roma', '', '#87d8f7', '#ffffff', 80], ['Fiorenza', '', '#482e92', '#ffffff', 79],
     ['Bolonya', '', '#a21c26', '#1a2f48', 79], ['Toro Granata', '', '#881f19', '#ffffff', 75], ['Lago Como', '', '#0a4595', '#ffffff', 77], ['Udinesi', '', '#f2f2f2', '#111111', 74],
-    ['Genova Grifone', '', '#a7193b', '#0e2b5c', 73], ['Casteddu Sardegna', '', '#b01028', '#0f2c5c', 72], ['Salento Lupi', '', '#ffd700', '#d50000', 71], ['Parmigiano', '', '#ffd200', '#1e3d8f', 72],
+    ['Genova Grifone', '', '#a7193b', '#0e2b5c', 73], ['Cagliaro Sardegna', '', '#b01028', '#0f2c5c', 72], ['Lecce Salento', '', '#ffd700', '#d50000', 71], ['Parmigiano', '', '#ffd200', '#1e3d8f', 72],
     ['Verona Scaligeri', '', '#003c82', '#ffd200', 71], ['Sassolino', '', '#00a752', '#111111', 72], ['Cremona Grigiorossi', '', '#c8102e', '#9e9e9e', 70], ['Pisa Torre', '', '#0a1f44', '#111111', 69]] },
   { id: 'fr', name: 'Division Une', country: 'Fransa', flag: '🇫🇷', nat: 'fr', dom: .45, euro: [3, 2, 1], teams: [
-    ['Paris Saint-Gérard', '', '#004170', '#da291c', 90], ['Marsilya', '', '#f2f2f2', '#2faee0', 83], ['Monako', '', '#e51b22', '#ffffff', 82], ['Lil Dogues', '', '#e01e13', '#20325f', 81],
+    ['Paris Saint-Gérard', '', '#004170', '#da291c', 90], ['Marsilya', '', '#f2f2f2', '#2faee0', 83], ['Monako', '', '#e51b22', '#ffffff', 82], ['Lille Dogues', '', '#e01e13', '#20325f', 81],
     ['Olympique Lion', '', '#f2f2f2', '#da0812', 81], ['Niçois', '', '#c8102e', '#111111', 78], ['Lents', '', '#ffd400', '#e2001a', 79], ['Renn', '', '#e13327', '#111111', 78],
     ['Strasburg', '', '#009fe3', '#ffffff', 77], ['Tuluz', '', '#5e2a84', '#ffffff', 75], ['Brest Pirates', '', '#e30613', '#ffffff', 75], ['Nantais', '', '#fcd405', '#00a650', 73],
-    ['Oxerre', '', '#f2f2f2', '#005baa', 72], ['Anjou SCO', '', '#111111', '#ffffff', 71], ['Le Havr', '', '#0f2d52', '#8dc8e8', 71], ['L\'Orient', '', '#f58113', '#111111', 71],
+    ['Oxerre', '', '#f2f2f2', '#005baa', 72], ['Angers Anjou', '', '#111111', '#ffffff', 71], ['Le Havr', '', '#0f2d52', '#8dc8e8', 71], ['L\'Orient', '', '#f58113', '#111111', 71],
     ['Mez', '', '#7c0a2b', '#ffffff', 70], ['Paris Club', '', '#0a2240', '#ffffff', 72]] },
   { id: 'de', name: 'Erste Liga', country: 'Almanya', flag: '🇩🇪', nat: 'de', dom: .45, euro: [4, 2, 1], teams: [
     ['B.Munih', '', '#dc052d', '#ffffff', 91], ['B.Dortmunt', '', '#fde100', '#111111', 85], ['Leverküzen', '', '#e32221', '#111111', 84], ['Leipzig Enerji', '', '#f2f2f2', '#dd0741', 83],
     ['Stuttgarter Löwen', '', '#f2f2f2', '#e32219', 81], ['Frankfurt Adler', '', '#111111', '#e1000f', 81], ['Freiburg Breisgau', '', '#f2f2f2', '#e2001a', 78], ['Volksburg', '', '#65b32e', '#ffffff', 77],
     ['Gladbach Fohlen', '', '#f2f2f2', '#111111', 77], ['Hoffenhayn', '', '#1961b5', '#ffffff', 77], ['Mainz Karneval', '', '#c3141e', '#ffffff', 76], ['Werda Bremen', '', '#1d9053', '#ffffff', 76],
-    ['Berlin Eisern', '', '#eb1923', '#ffffff', 76], ['Augsburg Fugger', '', '#ba3733', '#46714d', 74], ['Colonia Geißbock', '', '#f2f2f2', '#ed1c24', 74], ['Hamburg Dinos', '', '#f2f2f2', '#0a3f86', 74],
+    ['Berlin Eisern', '', '#eb1923', '#ffffff', 76], ['Augsburg Fugger', '', '#ba3733', '#46714d', 74], ['Köln Geißbock', '', '#f2f2f2', '#ed1c24', 74], ['Hamburg Dinos', '', '#f2f2f2', '#0a3f86', 74],
     ['St. Paulus', '', '#6c4a32', '#ffffff', 72], ['Heidenhaym', '', '#e2001a', '#003b79', 72]] },
   { id: 'pt', name: 'Primeira Divisão', country: 'Portekiz', flag: '🇵🇹', nat: 'pt', dom: .4, euro: [2, 2, 1], teams: [
     ['Benfika', '', '#e83030', '#ffffff', 84], ['Portu Dragões', '', '#00428c', '#ffffff', 84], ['Lisboa Leões', '', '#008057', '#ffffff', 85], ['Braga Arsenalistas', '', '#e20613', '#ffffff', 79],
-    ['Guimarães Conquistadores', '', '#f2f2f2', '#111111', 75], ['Famalikão', '', '#002c5f', '#ffffff', 73], ['Barcelos Galos', '', '#e30613', '#1d428a', 72], ['Moreira Cónegos', '', '#00843d', '#ffffff', 71],
+    ['Guimarães Conquistadores', '', '#f2f2f2', '#111111', 75], ['Famalikão', '', '#002c5f', '#ffffff', 73], ['Gil Barcelos', '', '#e30613', '#1d428a', 72], ['Moreirense Cónegos', '', '#00843d', '#ffffff', 71],
     ['Rio Ávila', '', '#00843d', '#ffffff', 70], ['Estoril Canarinhos', '', '#ffd200', '#0057a8', 71], ['Casa Pía', '', '#111111', '#ffffff', 69], ['Arouka', '', '#ffd200', '#0057a8', 70],
     ['Santa Klara', '', '#e30613', '#ffffff', 70], ['Madeira Nacional', '', '#111111', '#ffffff', 69], ['Estrela Amador', '', '#e30613', '#00843d', 68], ['Alverka', '', '#e30613', '#ffffff', 67],
     ['Tondella', '', '#00843d', '#ffd200', 67], ['Vila das Aves', '', '#c8102e', '#ffffff', 67]] },
@@ -56,17 +56,17 @@ const FB_LEAGUES = [
     ['Zwolle Blauwvingers', '', '#0057a8', '#ffffff', 70], ['Almelo Herakles', '', '#111111', '#ffffff', 69], ['Breda NAK', '', '#ffd200', '#111111', 69], ['Kralingen Excelsius', '', '#e30613', '#111111', 68],
     ['Telestar', '', '#f2f2f2', '#e30613', 67], ['Volendam Palingen', '', '#f58113', '#111111', 67]] },
   { id: 'be', name: 'Eerste Klasse', country: 'Belçika', flag: '🇧🇪', nat: 'be', dom: .4, euro: [1, 2, 1], teams: [
-    ['Brugge Blauw-Zwart', '', '#0057a8', '#111111', 80], ['Anderleht', '', '#5b2a86', '#ffffff', 77], ['Saint-Gilles Union', '', '#ffd200', '#0057a8', 78], ['Limburg Smurfen', '', '#0057a8', '#ffffff', 76],
-    ['Buffalo Gent', '', '#0057a8', '#ffffff', 75], ['Antwerpen Great Old', '', '#e30613', '#ffffff', 75], ['Liège Standart', '', '#e30613', '#ffffff', 73], ['Malinwa', '', '#ffd200', '#e30613', 72],
+    ['Brugge Blauw-Zwart', '', '#0057a8', '#111111', 80], ['Anderleht', '', '#5b2a86', '#ffffff', 77], ['Saint-Gilles Union', '', '#ffd200', '#0057a8', 78], ['Genk Limburg', '', '#0057a8', '#ffffff', 76],
+    ['Buffalo Gent', '', '#0057a8', '#ffffff', 75], ['Antwerpen Great Old', '', '#e30613', '#ffffff', 75], ['Liège Standart', '', '#e30613', '#ffffff', 73], ['Mechelen Malinwa', '', '#ffd200', '#e30613', 72],
     ['Westerlo Kemphanen', '', '#ffd200', '#0057a8', 71], ['Charleroi Zèbres', '', '#111111', '#ffffff', 71], ['Brugge Cercle Groen', '', '#00843d', '#111111', 70], ['Oud-Leuven', '', '#e30613', '#ffffff', 70],
-    ['Truiden Kanaries', '', '#ffd200', '#0057a8', 70], ['Denderleeuw', '', '#0057a8', '#ffffff', 68], ['Essevee', '', '#e30613', '#ffffff', 68], ['Louvière Loups', '', '#00843d', '#ffffff', 67]] },
+    ['Truiden Kanaries', '', '#ffd200', '#0057a8', 70], ['Denderleeuw', '', '#0057a8', '#ffffff', 68], ['Waregem Essevee', '', '#e30613', '#ffffff', 68], ['Louvière Loups', '', '#00843d', '#ffffff', 67]] },
   { id: 'no', name: 'Norsk Elite', country: 'Norveç', flag: '🇳🇴', nat: 'no', dom: .7, euro: [1, 1, 1], teams: [
     ['Bodø Glimmer', '', '#ffd200', '#111111', 78], ['Molde Fjord', '', '#0057a8', '#ffffff', 72], ['Rosenburg', '', '#f2f2f2', '#111111', 72], ['Bergen Branners', '', '#e30613', '#ffffff', 73],
     ['Stavanger Vikings', '', '#0057a8', '#ffffff', 71], ['Tromsø Nordlys', '', '#e30613', '#ffffff', 69], ['Sarpsborg Ståle', '', '#0057a8', '#ffffff', 68], ['Fredrikstat', '', '#e30613', '#ffffff', 68],
     ['Oslo Ungdom', '', '#0057a8', '#ffffff', 66], ['Sandefjord Hval', '', '#0057a8', '#ffffff', 66], ['Godset Drammen', '', '#0057a8', '#ffffff', 66], ['Hamar Kameratene', '', '#00843d', '#ffffff', 65],
-    ['Kristiansund Klippfisk', '', '#0057a8', '#ffffff', 65], ['Haugesund Måker', '', '#111111', '#ffffff', 64], ['Oslo Bohemen', '', '#0a2240', '#e30613', 68], ['Bryne Jæren', '', '#e30613', '#ffffff', 64]] },
+    ['Kristiansund Klippfisk', '', '#0057a8', '#ffffff', 65], ['Haugesund Måker', '', '#111111', '#ffffff', 64], ['Vålerengen Oslo', '', '#0a2240', '#e30613', 68], ['Bryne Jæren', '', '#e30613', '#ffffff', 64]] },
   { id: 'ru', name: 'Vysshaya Liga', country: 'Rusya', flag: '🇷🇺', nat: 'ru', dom: .7, euro: [0, 0, 0], teams: [
-    ['Zenith Piter', '', '#0094d8', '#ffffff', 80], ['Kuban Boğaları', '', '#111111', '#00843d', 78], ['Spartaküs Moskova', '', '#e30613', '#ffffff', 76], ['Moskova Ordu', '', '#0057a8', '#e30613', 76],
+    ['Zenith Piter', '', '#0094d8', '#ffffff', 80], ['Krasnodar Boğaları', '', '#111111', '#00843d', 78], ['Spartaküs Moskova', '', '#e30613', '#ffffff', 76], ['Moskova Ordu', '', '#0057a8', '#e30613', 76],
     ['Moskova Demiryolu', '', '#e30613', '#00843d', 75], ['Moskova Dinamik', '', '#0057a8', '#ffffff', 75], ['Rostov Don', '', '#ffd200', '#0057a8', 71], ['Kazan Yakut', '', '#7a1f3d', '#00843d', 71],
     ['Grozni Terek', '', '#00843d', '#ffffff', 69], ['Samara Kanatları', '', '#0057a8', '#ffffff', 69], ['Mahaçkale Dağlılar', '', '#0057a8', '#ffffff', 68], ['Orenburg Gaz', '', '#0057a8', '#ffffff', 68],
     ['Nijni Novgorod', '', '#111111', '#ffffff', 67], ['Kaliningrad Baltık', '', '#0057a8', '#ffffff', 68], ['Tolyatti Otomobil', '', '#111111', '#ffffff', 66], ['Soçi Sahil', '', '#0057a8', '#ffd200', 66]] },
@@ -76,15 +76,15 @@ const FB_LEAGUES = [
     ['Səbail Liman', '', '#0057a8', '#ffffff', 62], ['Qəbələ Dağlar', '', '#e30613', '#ffffff', 63], ['Şamaxı Şahlar', '', '#00843d', '#ffffff', 62], ['İmişli Pambıq', '', '#c8102e', '#ffffff', 61]] },
   // v14: five more leagues — club line-ups are the 2026-27 seasons (checked Nov 2026); colours are the clubs' traditional kit colours, strength is a game estimate
   { id: 'sc', name: 'Scottish Top Flight', country: 'İskoçya', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', nat: 'sc', dom: .55, euro: [1, 1, 1], teams: [
-    ['Glasgow Kelt', '', '#018749', '#ffffff', 79], ['Glasgow Gers', '', '#1b458f', '#ffffff', 77], ['Heart of Lothian', '', '#7a1f3d', '#ffffff', 70], ['Granite City', '', '#e30613', '#ffffff', 69],
-    ['Leith Hibees', '', '#00843d', '#ffffff', 68], ['Motherwel Steelmen', '', '#ffb612', '#7a1f3d', 67], ['Dundee Terrors', '', '#f58113', '#111111', 66], ['Ayrshire Killie', '', '#0057a8', '#ffffff', 64],
+    ['Glasgow Kelt', '', '#018749', '#ffffff', 79], ['Glasgow Gers', '', '#1b458f', '#ffffff', 77], ['Heart of Lothian', '', '#7a1f3d', '#ffffff', 70], ['Aberdeen Granit', '', '#e30613', '#ffffff', 69],
+    ['Leith Hibees', '', '#00843d', '#ffffff', 68], ['Motherwel Steelmen', '', '#ffb612', '#7a1f3d', 67], ['Dundee Terrors', '', '#f58113', '#111111', 66], ['Kilmarnock Killie', '', '#0057a8', '#ffffff', 64],
     ['Paisley Buddies', '', '#111111', '#ffffff', 64], ['Dundee Dark Blues', '', '#0a2240', '#ffffff', 63], ['Falkirk Bairns', '', '#0a2240', '#e30613', 63], ['Perth Saints', '', '#0057a8', '#ffffff', 62]] },
   { id: 'at', name: 'Österreich Liga', country: 'Avusturya', flag: '🇦🇹', nat: 'at', dom: .6, euro: [1, 1, 1], teams: [
     ['Salzburg Mozart', '', '#f2f2f2', '#d6001c', 78], ['Graz Sturmvogel', '', '#111111', '#ffffff', 75], ['Wien Grün-Weiß', '', '#00843d', '#ffffff', 72], ['Wien Veilchen', '', '#5b2a86', '#ffffff', 71],
-    ['Linz Athletik', '', '#111111', '#f2f2f2', 71], ['Lavanttal Wölfe', '', '#111111', '#f2f2f2', 69], ['Hartberg Steiermark', '', '#0057a8', '#ffffff', 66], ['Graz Rotjacken', '', '#e30613', '#ffffff', 64],
+    ['Linz Athletik', '', '#111111', '#f2f2f2', 71], ['Wolfsberg Wölfe', '', '#111111', '#f2f2f2', 69], ['Hartberg Steiermark', '', '#0057a8', '#ffffff', 66], ['Graz Rotjacken', '', '#e30613', '#ffffff', 64],
     ['Tirol Wattens', '', '#00843d', '#ffffff', 64], ['Innviertel Ried', '', '#111111', '#00843d', 64], ['Altach Rheindorf', '', '#111111', '#ffd200', 64], ['Lustenau Grün', '', '#00843d', '#ffffff', 63]] },
   { id: 'ch', name: 'Schweizer Liga', country: 'İsviçre', flag: '🇨🇭', nat: 'ch', dom: .5, euro: [1, 1, 1], teams: [
-    ['Bern Jungs', '', '#ffd200', '#111111', 76], ['Basel Bebbi', '', '#e30613', '#0057a8', 75], ['Lugano Bianconeri', '', '#111111', '#ffffff', 72], ['Genf Grenats', '', '#7a1f3d', '#ffffff', 71],
+    ['Bern Jungs', '', '#ffd200', '#111111', 76], ['Basel Bebbi', '', '#e30613', '#0057a8', 75], ['Lugano Bianconeri', '', '#111111', '#ffffff', 72], ['Servetta Genf', '', '#7a1f3d', '#ffffff', 71],
     ['Thun Oberland', '', '#e30613', '#ffffff', 70], ['St. Gallus', '', '#00843d', '#ffffff', 70], ['Luzern Leuchten', '', '#0057a8', '#ffffff', 69], ['Zürih Stadt', '', '#f2f2f2', '#0057a8', 69],
     ['Sion Valais', '', '#f2f2f2', '#e30613', 68], ['Lausanne Léman', '', '#0057a8', '#ffffff', 68], ['Zürih Çekirgeleri', '', '#0057a8', '#f2f2f2', 67], ['Vaduz Prens', '', '#e30613', '#0057a8', 64]] },
   { id: 'gr', name: 'Ethniki A', country: 'Yunanistan', flag: '🇬🇷', nat: 'gr', dom: .5, euro: [1, 1, 1], teams: [

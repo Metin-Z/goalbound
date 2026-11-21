@@ -88,6 +88,22 @@ const FBT = {
     if (!FBT._sq || FBT._sq.seed !== FBT.seed) FBT._sq = { seed: FBT.seed, map: FBT._build(FBT.seed) };
     return FBT._sq.map[id].map(p => ({ ...p }));
   },
+  // Player profile for any club player (deterministic per career seed + club + role, so it never needs saving):
+  // attributes on the user's 0-99 scale, overall, and a playing style that steers his decisions on the pitch
+  STYLES: { ST: [['runner', 'Arkaya koşu', 3], ['target', 'Pivot santrfor', 2], ['poacher', 'Fırsatçı golcü', 2]], W: [['crosser', 'Orta açan', 3], ['inverted', 'İçe kat eden', 3], ['dribbler', 'Çalımcı', 2]],
+    CM: [['playmaker', 'Oyun kurucu', 3], ['b2b', 'Box-to-box', 3], ['longshot', 'Uzaktan şutör', 2], ['anchor', 'Ön libero', 2]], FB: [['overlap', 'Bindiren bek', 3], ['stay', 'Dengeli bek', 2]],
+    CB: [['stopper', 'Sert stoper', 2], ['ballplayer', 'Oyun kuran stoper', 2]], GK: [['keeper', 'Kaleci', 1]] },
+  GROUP: { GK: 'GK', LB: 'FB', RB: 'FB', LCB: 'CB', RCB: 'CB', LCM: 'CM', CM: 'CM', RCM: 'CM', LW: 'W', RW: 'W', ST: 'ST' },
+  prof(id, role, sk) {
+    const k = FBT.seed + '|' + id + '|' + role, C2 = FBT._pf || (FBT._pf = {}); if (C2[k]) return C2[k];
+    const r = FBU.rng('pf' + k), g = FBT.GROUP[role] || 'CM', base = Math.round((sk || .7) * 100);
+    const T = { GK: { fizik: 4, def: 6, sut: -30, hiz: -10 }, CB: { fizik: 8, def: 10, hiz: -4, pas: -4, sut: -14, teknik: -6 }, FB: { hiz: 6, def: 4, sut: -10, teknik: -2 }, CM: { pas: 8, teknik: 4, sut: -2, fizik: 0 }, W: { hiz: 8, teknik: 6, def: -12, pas: 0 }, ST: { sut: 10, fizik: 2, def: -16, pas: -4 } }[g];
+    const at = {}; ['hiz', 'pas', 'sut', 'teknik', 'fizik', 'def'].forEach(a => at[a] = FBU.clamp(Math.round(base + (T[a] || 0) + (r() - .5) * 14), 25, 96));
+    const S = FBT.STYLES[g]; let x = r() * S.reduce((a, b) => a + b[2], 0), st = S[0]; for (const s2 of S) if ((x -= s2[2]) < 0) { st = s2; break; }
+    return (C2[k] = { at, ovr: base, style: st[0], styleTr: st[1], g });
+  },
+  // How much a player's style tilts his share of goals ('g') and assists ('a')
+  styleW(style, kind) { return (kind === 'g' ? { poacher: 1.35, runner: 1.15, target: 1.1, inverted: 1.3, longshot: 1.35, b2b: 1.2, anchor: .6, playmaker: .85, crosser: .8, overlap: .9, stopper: .7, ballplayer: .8 } : { crosser: 1.6, playmaker: 1.7, dribbler: 1.2, inverted: 1.1, overlap: 1.4, target: 1.25, b2b: 1.1, anchor: .7, poacher: .7, longshot: .9, stopper: .6, ballplayer: .9 })[style] || 1; },
   // Build every club's 11 in fixed order so no name repeats anywhere in the career and nobody plays for two clubs
   _build(seed) {
     const used = new Set(), map = {};
@@ -180,6 +196,10 @@ const FBX = {
     mul(['box', 'thru', 'late'], FBU.clamp(1 + dr * .02, .6, 1.5)); mul(['counter', 'own'], FBU.clamp(1 - dr * .025, .5, 1.8));
     if (late && diff < 0) { mul(['box', 'edge', 'wing', 'long', 'late'], 1.5); mul(['pass', 'own'], .6); }   // chasing the game
     if (late && diff > 0) { mul(['counter'], 1.8); mul(['pass'], 1.2); mul(['box'], .8); }   // protecting a lead
+    // home side and the side in better form create a little more in the final third
+    mul(['box', 'cross', 'corner', 'rebound'], FBU.clamp(1 + (ctx.home ? .08 : -.04) + (ctx.form || 0) * .01, .8, 1.25));
+    // variety: the last moment is much less likely to repeat, recent ones a bit less
+    (ctx.recent || []).forEach((k, i) => { if (w[k]) w[k] *= i === 0 ? .2 : i < 3 ? .55 : .8; });
     let r = Math.random() * Object.values(w).reduce((a, b) => a + b, 0);
     for (const [k, v] of Object.entries(w)) if ((r -= v) <= 0) return k;
     return 'pass';
@@ -412,18 +432,20 @@ const FBS = {
     if (!d) { d = FBS.parse(localStorage.getItem(FBS.key(n) + '_b')); if (d) { d._recovered = true; } }
     return d;
   },
-  del(n) { localStorage.removeItem(FBS.key(n)); localStorage.removeItem(FBS.key(n) + '_b'); }
+  // One-off copy of a save taken before a format migration (never overwritten once written)
+  backup(n, data, tag) { try { const k = FBS.key(n) + '_' + tag; if (n != null && !localStorage.getItem(k)) localStorage.setItem(k, JSON.stringify(data)); } catch (e) {} },
+  del(n) { ['', '_b', '_pre3'].forEach(x => localStorage.removeItem(FBS.key(n) + x)); }
 };
 
 /* Moment types each position is involved in (shared by played and simulated matches) */
 // Scenario weights by position (how often each kind of moment reaches you). Every kind can happen to everyone,
 // but at a frequency that fits the role. FBX.pickScene adjusts them for team strength, score and minute.
 const FB_SCEN = {
-  FW: { box: 3, thru: 2.5, drive: 1, oneone: 1, late: .8, edge: .9, counter: 1, long: .4, pass: .4, wing: .3, own: .15, fk: .5 },
-  W: { wing: 3, drive: 1.6, oneone: 1, counter: 1.2, box: .9, edge: .9, late: .5, long: .5, thru: .6, pass: .5, own: .3, fk: .5 },
-  AM: { edge: 1.6, pass: 1.8, long: 1.2, box: .9, late: .8, drive: .9, thru: .9, counter: .8, oneone: .4, own: .4, wing: .4, fk: .7 },
-  CM: { pass: 2.6, own: 1.2, edge: 1.3, long: 1.2, drive: .9, counter: .8, late: .6, box: .4, thru: .3, wing: .3, fk: .6 },
-  DF: { pass: 1.8, own: 2, box: .6, drive: .5, long: .3, late: .3, edge: .3, fk: .4, counter: .2 }
+  FW: { box: 2.4, thru: 2.2, drive: 1, oneone: 1, late: .8, edge: .9, counter: 1, long: .4, pass: .4, wing: .3, own: .15, fk: .5, cross: 2, rebound: 1, layoff: 1.2, corner: .4, second: .3 },
+  W: { wing: 3, drive: 1.6, oneone: 1, counter: 1.2, box: .8, edge: .9, late: .5, long: .5, thru: .6, pass: .5, own: .3, fk: .5, cross: .6, rebound: .4, switch: .3, second: .3 },
+  AM: { edge: 1.5, pass: 1.6, long: 1.1, box: .8, late: .8, drive: .9, thru: .9, counter: .8, oneone: .4, own: .4, wing: .4, fk: .7, rebound: .6, second: .9, layoff: .5, cross: .5, switch: .6 },
+  CM: { pass: 2.2, own: 1.2, edge: 1.2, long: 1.2, drive: .9, counter: .8, late: .6, box: .4, thru: .3, wing: .3, fk: .6, switch: 1.3, second: 1.4, rebound: .3, corner: .4 },
+  DF: { pass: 1.6, own: 1.8, box: .4, drive: .5, long: .3, late: .2, edge: .3, fk: .4, counter: .2, corner: 1.5, second: .4, switch: .6 }
 };
 // Legacy flat lists (kept for older code paths): each type repeated by its rounded weight
 const FB_MIX = Object.fromEntries(Object.entries(FB_SCEN).map(([k, w]) => [k, Object.entries(w).flatMap(([t, n]) => Array(Math.max(1, Math.round(n))).fill(t))]));

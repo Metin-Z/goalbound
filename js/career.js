@@ -21,13 +21,14 @@ const FBC = {
   },
   // Add skill points; every full 100 turns into 3 development rights, the remainder carries over
   // Skill points needed for the next level (every level gives 3 development rights): BASE + STEP * level
-  SK_BASE: 100, SK_STEP: 5, SK_RIGHTS: 3,
-  need(lvl) { return FBC.SK_BASE + FBC.SK_STEP * (lvl || 0); },
+  SK_BASE: 55, SK_STEP: 6, SK_RIGHTS: 3,
+  // Threshold for the next level: 55 at the start, then a gently accelerating curve (lvl 10 ≈ 125, lvl 20 ≈ 215)
+  need(lvl) { const l = lvl || 0; return Math.round(FBC.SK_BASE + FBC.SK_STEP * l + .1 * l * l); },
   // Add (or remove) skill points; each threshold passed gives rights, the remainder carries over to the next, larger threshold
   addSkill(p, delta) { p.skill = Math.max(0, (p.skill || 0) + delta); p.lvl = p.lvl || 0; let g = 0; while (p.skill >= FBC.need(p.lvl)) { p.skill -= FBC.need(p.lvl); p.lvl++; p.up += FBC.SK_RIGHTS; g += FBC.SK_RIGHTS; } return g; },
   // Resolve one user moment without playing it (used for simulated matches)
   simMoment(type, A, pos) {
-    type = { long: 'edge', own: 'pass', late: 'box', oneone: 'drive' }[type] || type;   // newer kinds resolve like their base kind
+    type = { long: 'edge', own: 'pass', late: 'box', oneone: 'drive', cross: 'box', corner: 'box', rebound: 'box', layoff: 'pass', switch: 'pass', second: 'edge' }[type] || type;   // newer kinds resolve like their base kind
     const r = Math.random, us = { sh: 0, sot: 0, pk: 0, pf: 0, dr: 0, lost: 0, miss: 0, wide: 0, blk: 0, post: 0 }, out = { us, goal: false, assist: false };
     if (type === 'def') {   // duel first (hız/fizik/teknik), then the pass forward (pas)
       const w = .38 + A.fizik / 400 + A.hiz / 800 + A.teknik / 800 + FBX.posDef(pos || 'CM'), x = r();
@@ -119,7 +120,7 @@ function Futbol(host) {
       if (!d) { FBA.play('back'); toast('⚠️ Bu dosya geçerli bir GOALBOUND kaydı değil'); return; }
       delete d._recovered;
       if (!FBS.write(n, d)) { toast('⚠️ Kayıt yazılamadı — depolama dolu olabilir'); return; }
-      C = migrate(FBS.read(n)); slot = n; if (C._needStats) { delete C._needStats; ensureStats(); save(true); }
+      slot = n; C = migrate(FBS.read(n)); if (C._needStats) { delete C._needStats; ensureStats(); save(true); }
       FBA.play('confirm'); toast('⬆️ Kayıt içe aktarıldı'); tab = 'ana'; show('hub');
     }); };
     inp.click();
@@ -177,7 +178,7 @@ function Futbol(host) {
       for (let i = 0; i < al.length; i += 2) {
         const a = al[i], b = al[i + 1];
         if (userTie && (a === C.club || b === C.club) && k === userTie.cup) { const mineA = a === C.club, s = userTie.sc; const sa = mineA ? s[0] : s[1], sb = mineA ? s[1] : s[0]; const w = userTie.win ? C.club : (mineA ? b : a); res.push([a, b, sa, sb, sa === sb ? (w === a ? 'a' : 'b') : '']); win.push(w); continue; }
-        const [sa, sb] = FBC.simScore(FBT.team(a).r, FBT.team(b).r, st === 3);
+        const [sa, sb] = FBC.simScore(FBT.team(a).r + fAdj(a), FBT.team(b).r + fAdj(b), st === 3);
         let w = sa > sb ? a : sb > sa ? b : (Math.random() < .5 + (FBT.team(a).r - FBT.team(b).r) / 60 ? a : b);
         res.push([a, b, sa, sb, sa === sb ? (w === a ? 'a' : 'b') : '']); win.push(w);
       }
@@ -189,8 +190,8 @@ function Futbol(host) {
     for (const lg in C.s.o) {
       const X = C.s.o[lg], L = FBT.league(lg), n = L.teams.length, F = FBC.rr(n, 'fx' + C.s.year + lg + C.created), target = Math.min(F.length, Math.round(frac * F.length));
       for (; X.rd < target; X.rd++) F[X.rd].forEach(([h, a]) => {
-        const [gh, ga] = FBC.simScore(L.teams[h][4], L.teams[a][4]), H = lg + ':' + h, Aw = lg + ':' + a; FBC.addRes(X.tab, h, a, gh, ga);
-        creditTeam(H, gh, null); creditTeam(Aw, ga, null); monPts(lg, H, gh, ga); monPts(lg, Aw, ga, gh); form(H, gh, ga); form(Aw, ga, gh);
+        const H = lg + ':' + h, Aw = lg + ':' + a, [gh, ga] = FBC.simScore(L.teams[h][4] + fAdj(H), L.teams[a][4] + fAdj(Aw)); FBC.addRes(X.tab, h, a, gh, ga);
+        creditTeam(H, gh, null); creditTeam(Aw, ga, null); monPts(lg, H, gh, ga); monPts(lg, Aw, ga, gh); form(H, gh, ga, L.teams[a][4]); form(Aw, ga, gh, L.teams[h][4]);
         if (MEDIA.big.includes(lg)) MEDIA.note(lg, H, Aw, gh, ga);
       });
     }
@@ -215,21 +216,21 @@ function Futbol(host) {
   function simUser(f, frac = 1, base) {
     const t = club(), o = FBT.team(f.opp), p = me(), sq = FBT.squad(C.club).filter(x => ['ST', 'LW', 'RW', 'CM', 'LCM', 'RCM'].includes(x.role) && x.role !== FBC.ROLE_OF[p.pos]), osq = FBT.squad(f.opp).filter(x => x.role !== 'GK');
     // same model as a played match: the user's own chances are part of the team's expected goals
-    const [lM, lO] = FBX.lam(t.r, o.r, f.neutral ? 0 : f.home ? 1 : -1), raw = [FBU.poisson(Math.max(.12, lM - FB_ATTN[p.pos] * .16)), FBU.poisson(Math.max(.12, lO - FB_DEFN[p.pos] * .06))];
+    const [lM, lO] = FBX.lam(t.r + fAdj(C.club), o.r + fAdj(f.opp), f.neutral ? 0 : f.home ? 1 : -1), raw = [FBU.poisson(Math.max(.12, lM - FB_ATTN[p.pos] * .16)), FBU.poisson(Math.max(.12, lO - FB_DEFN[p.pos] * .06))];
     const us = Object.assign({ g: 0, a: 0, sh: 0, sot: 0, pk: 0, pf: 0, dr: 0, lost: 0, miss: 0, wide: 0, blk: 0, post: 0, err: 0 }, base ? base.us : {});
     const sc = base ? base.sc.slice() : [0, 0], log = base ? base.log.slice() : [], m0 = base ? base.min : 0, mt = () => Math.floor(m0 + Math.random() * (90 - m0)) + 1;
     const keep = n => { let k = 0; for (let i = 0; i < n; i++) if (Math.random() < frac) k++; return k; };
-    const ast = (pool, sc2) => Math.random() < .72 ? FBU.pick(pool.filter(x => x !== sc2)) : null;
-    for (let i = keep(raw[0]); i > 0; i--) { sc[0]++; const s2 = FBU.pick(sq), a2 = ast(sq, s2); log.push({ m: mt(), side: 0, name: s2.short, r: s2.role, a: a2 && a2.short, ar: a2 && a2.role }); }
-    for (let i = 0; i < raw[1]; i++) if (Math.random() < frac) { sc[1]++; const s2 = FBU.pick(osq), a2 = ast(osq, s2); log.push({ m: mt(), side: 1, name: s2.short, r: s2.role, a: a2 && a2.short, ar: a2 && a2.role }); }
+    const ast = (pool, sc2) => { if (Math.random() >= .72) return null; const cl = pool === sq ? C.club : f.opp, L = pool.filter(x => x !== sc2), w = L.map(x => (AW[x.role] || 3) * FBT.styleW(FBT.prof(cl, x.role, x.sk).style, 'a')), t = w.reduce((a, b) => a + b, 0); let r = Math.random() * t; for (let i = 0; i < L.length; i++) if ((r -= w[i]) < 0) return L[i]; return L[0]; };
+    for (let i = keep(raw[0]); i > 0; i--) { sc[0]++; const s2 = gPick(C.club, sq), a2 = ast(sq, s2); log.push({ m: mt(), side: 0, name: s2.short, r: s2.role, a: a2 && a2.short, ar: a2 && a2.role }); }
+    for (let i = 0; i < raw[1]; i++) if (Math.random() < frac) { sc[1]++; const s2 = gPick(f.opp, osq), a2 = ast(osq, s2); log.push({ m: mt(), side: 1, name: s2.short, r: s2.role, a: a2 && a2.short, ar: a2 && a2.role }); }
     const n = Math.round((FB_ATTN[p.pos] - 1 + Math.random() * 1.5) * frac);
     for (let i = 0; i < n; i++) {
       const r = FBC.simMoment(FBX.pickScene(p.pos, { dr: t.r - o.r, diff: sc[0] - sc[1], min: 20 + i * 15 }), p.attr, p.pos); Object.keys(r.us).forEach(k => us[k] += r.us[k]);
       if (r.goal) { us.g++; sc[0]++; log.push({ m: mt(), side: 0, name: p.short, user: true }); }
-      if (r.assist) { us.a++; sc[0]++; const s2 = FBU.pick(sq); log.push({ m: mt(), side: 0, name: s2.short, r: s2.role, a: p.short, ar: 'ME' }); }
+      if (r.assist) { us.a++; sc[0]++; const s2 = gPick(C.club, sq); log.push({ m: mt(), side: 0, name: s2.short, r: s2.role, a: p.short, ar: 'ME' }); }
     }
     const nd = Math.round((FB_DEFN[p.pos] * .6 + Math.random() * .6) * frac * FBU.clamp(1 - (t.r - o.r) * .025, .6, 1.5));
-    for (let i = 0; i < nd; i++) { const r = FBC.simMoment('def', p.attr, p.pos); Object.keys(r.us).forEach(k => us[k] = (us[k] || 0) + r.us[k]); if (r.conceded) { sc[1]++; const s2 = FBU.pick(osq); log.push({ m: mt(), side: 1, name: s2.short, r: s2.role }); } }
+    for (let i = 0; i < nd; i++) { const r = FBC.simMoment('def', p.attr, p.pos); Object.keys(r.us).forEach(k => us[k] = (us[k] || 0) + r.us[k]); if (r.conceded) { sc[1]++; const s2 = gPick(f.opp, osq); log.push({ m: mt(), side: 1, name: s2.short, r: s2.role }); } }
     log.sort((a, b) => a.m - b.m);
     us.r = FBU.rate(us, sc[0], sc[1]);
     return { sc, us, log, sim: true };
@@ -244,6 +245,10 @@ function Futbol(host) {
     const M = (s.mon || (s.mon = {}))[lg] || (s.mon[lg] = {}); (M[key] || (M[key] = [0, 0, 0]))[i] += n;
   }
   const injured = club => Object.keys(C.s.inj || {}).filter(k => k.startsWith(club + '|')).map(k => k.split('|')[1]);
+  // Scorer from a list of squad players, weighted by role share, style and form
+  function gPick(club, list) { const w = list.map(x => (GW[x.role] || 1) * FBT.styleW(FBT.prof(club, x.role, x.sk).style, 'g') * (1 + playerForm(club, x.role) * .05)), t = w.reduce((a, b) => a + b, 0); let r = Math.random() * t; for (let i = 0; i < list.length; i++) if ((r -= w[i]) < 0) return list[i]; return list[0]; }
+  // Goal/assist role weights adjusted for each player's style and current form at this club
+  function wts(club, base, kind) { const sq = FBT.squad(club), o = {}; Object.entries(base).forEach(([r, v]) => { const q = sq.find(x => x.role === r); o[r] = v * (q ? FBT.styleW(FBT.prof(club, r, q.sk).style, kind) : 1) * (1 + playerForm(club, r) * .05); }); return o; }
   function wpick(w, excl) { const e = Object.entries(w).filter(([k]) => !excl.includes(k)); let x = Math.random() * e.reduce((a, b) => a + b[1], 0); for (const [k, v] of e) if ((x -= v) < 0) return k; return e[0][0]; }
   function roleOf(club, short, excl) { const q = FBT.squad(club).find(p => p.short === short && !excl.includes(p.role)); return q ? q.role : null; }
   // One league match for one team: appearances (some rotation), then scorers and assisters
@@ -252,15 +257,35 @@ function Futbol(host) {
     FBT.ROLES.forEach(r => { if (excl.includes(r) || (r !== 'GK' && Math.random() < .07)) return; psAdd(club + '|' + r, 0); });
     if (entries) entries.forEach(e => {
       const rr2 = r => r && !excl.includes(r) && r !== 'ME' ? r : null;
-      const sk = e.user ? 'ME' : club + '|' + (rr2(e.r) || roleOf(club, e.name, excl) || wpick(GW, excl)); psAdd(sk, 1); scorers.push(sk);
-      if (e.a) { const ak = mine && (e.ar === 'ME' || (!e.ar && e.a === me().short)) ? 'ME' : club + '|' + (rr2(e.ar) || roleOf(club, e.a, excl) || wpick(AW, excl)); if (ak !== sk) psAdd(ak, 2); }
+      const sk = e.user ? 'ME' : club + '|' + (rr2(e.r) || roleOf(club, e.name, excl) || wpick(wts(club, GW, 'g'), excl)); psAdd(sk, 1); scorers.push(sk);
+      if (e.a) { const ak = mine && (e.ar === 'ME' || (!e.ar && e.a === me().short)) ? 'ME' : club + '|' + (rr2(e.ar) || roleOf(club, e.a, excl) || wpick(wts(club, AW, 'a'), excl)); if (ak !== sk) psAdd(ak, 2); }
     });
-    else for (let i = 0; i < goals; i++) { const g = wpick(GW, excl); psAdd(club + '|' + g, 1); scorers.push(club + '|' + g); if (Math.random() < .8) psAdd(club + '|' + wpick(AW, excl.concat(g)), 2); }
+    else { const gw = wts(club, GW, 'g'), aw = wts(club, AW, 'a'); for (let i = 0; i < goals; i++) { const g = wpick(gw, excl); psAdd(club + '|' + g, 1); scorers.push(club + '|' + g); if (Math.random() < .8) psAdd(club + '|' + wpick(aw, excl.concat(g)), 2); } }
     return scorers;
   }
   // Month points per club (for the player-of-the-month team contribution) and recent form
   function monPts(lg, club, gf, ga) { const s = C.s, P = (s.monP || (s.monP = {}))[lg] || (s.monP[lg] = {}); P[club] = (P[club] || 0) + (gf > ga ? 3 : gf === ga ? 1 : 0); }
-  function form(club, gf, ga) { const F = C.s.form || (C.s.form = {}); F[club] = ((F[club] || '') + (gf > ga ? 'G' : gf === ga ? 'B' : 'M')).slice(-6); }
+  function form(club, gf, ga, oppR) {
+    const F = C.s.form || (C.s.form = {}); F[club] = ((F[club] || '') + (gf > ga ? 'G' : gf === ga ? 'B' : 'M')).slice(-6);
+    const H = C.s.fh || (C.s.fh = {}); (H[club] || (H[club] = [])).push([gf, ga, Math.round(oppR || FBT.team(club).r)]); if (H[club].length > 10) H[club].shift();
+  }
+  // Team form over the last 10 matches (newest weighs most): points, goal difference and the strength of the opponents.
+  // Returns roughly -5..+5; fAdj turns it into a rating bonus of at most ±3 on top of the club's overall
+  function formPts(club) {
+    const h = ((C.s && C.s.fh) || {})[club]; if (!h || !h.length) { const f = ((C.s && C.s.form) || {})[club] || ''; return [...f].reduce((a, c) => a + (c === 'G' ? .6 : c === 'M' ? -.6 : 0), 0); }
+    const own = FBT.team(club).r; let sw = 0, sv = 0;
+    h.forEach(([gf, ga, or], i) => { const w = .55 + .45 * (i + 1) / h.length, pts = gf > ga ? 3 : gf === ga ? 1 : 0, v = (pts - 1.35) * 1.4 + FBU.clamp(gf - ga, -3, 3) * .45 + (or - own) * .05 * (pts ? 1 : .3); sw += w; sv += v * w; });
+    return FBU.clamp(sv / sw * 2 * Math.min(1, h.length / 5 + .2), -5, 5);
+  }
+  // The user's own form from his last five ratings (-1..+1), used for small accuracy changes in played matches
+  const uForm = () => { const r = (C.s.mine || []).filter(m => !m.dnp && m.r).slice(-5); return r.length ? FBU.clamp((r.reduce((a, m) => a + m.r, 0) / r.length - 6.6) / 1.2, -1, 1) : 0; };
+  const fAdj = club => Math.round(formPts(club) * .6 * 10) / 10;
+  // A player's current form (-5..+5): his team's form plus his goals/assists per game this month
+  function playerForm(club, role) {
+    const lg = club.slice(0, club.indexOf(':')), M = ((C.s.mon || {})[lg] || {})[club + '|' + role];
+    const contrib = M && M[0] ? (M[1] * 1.3 + M[2] * .9) / M[0] : 0, exp = { ST: .55, LW: .45, RW: .45, LCM: .25, CM: .2, RCM: .25 }[role] || .1;
+    return FBU.clamp(formPts(club) * .5 + (M && M[0] ? (contrib - exp) * 6 : 0), -5, 5);
+  }
   function leaders(idx, lg) {
     const T = !lg || lg === C.s.lg ? C.s.ps : (C.s.ops || {})[lg];
     return Object.entries(T || {}).map(([k, v]) => ({ k, apps: v[0], g: v[1], a: v[2], v: idx === 3 ? v[1] + v[2] : v[idx] }))
@@ -442,7 +467,7 @@ function Futbol(host) {
     let pen = '', win = res.sc[0] > res.sc[1];
     if (f.e.k === 'L') {
       const R = fixtures()[f.e.r], L = FBT.league(s.lg);
-      const rr = R.map(([h, a]) => { if (h === myIdx() || a === myIdx()) { const gh = f.home ? res.sc[0] : res.sc[1], ga = f.home ? res.sc[1] : res.sc[0]; return [h, a, gh, ga]; } const [gh, ga] = FBC.simScore(L.teams[h][4], L.teams[a][4]); return [h, a, gh, ga]; });
+      const rr = R.map(([h, a]) => { if (h === myIdx() || a === myIdx()) { const gh = f.home ? res.sc[0] : res.sc[1], ga = f.home ? res.sc[1] : res.sc[0]; return [h, a, gh, ga]; } const [gh, ga] = FBC.simScore(L.teams[h][4] + fAdj(s.lg + ':' + h), L.teams[a][4] + fAdj(s.lg + ':' + a)); return [h, a, gh, ga]; });
       rr.forEach(([h, a, gh, ga]) => FBC.addRes(s.tab, h, a, gh, ga)); s.res[f.e.r] = rr.map(x => [x[2], x[3]]);
       rr.forEach(([h, a, gh, ga]) => { if (h === myIdx() || a === myIdx()) return; creditTeam(s.lg + ':' + h, gh, null); creditTeam(s.lg + ':' + a, ga, null); });
       const lg0 = (res.log || []).filter(e => e.side === 0), lg1 = (res.log || []).filter(e => e.side === 1);
@@ -450,7 +475,7 @@ function Futbol(host) {
       // goals without a log line (rare: older sims) still count for someone
       for (let i = lg0.length; i < res.sc[0]; i++) psAdd(C.club + '|' + wpick(GW, [myRole()]), 1);
       for (let i = lg1.length; i < res.sc[1]; i++) psAdd(f.opp + '|' + wpick(GW, []), 1);
-      rr.forEach(([h, a, gh, ga]) => { const H = s.lg + ':' + h, Aw = s.lg + ':' + a; monPts(s.lg, H, gh, ga); monPts(s.lg, Aw, ga, gh); form(H, gh, ga); form(Aw, ga, gh); });
+      rr.forEach(([h, a, gh, ga]) => { const H = s.lg + ':' + h, Aw = s.lg + ':' + a; monPts(s.lg, H, gh, ga); monPts(s.lg, Aw, ga, gh); form(H, gh, ga, FBT.team(Aw).r); form(Aw, ga, gh, FBT.team(H).r); });
       const mr = s.monR || (s.monR = { s: 0, n: 0 }); mr.s += us.r; mr.n++;
       MEDIA.notes = []; advanceOthers((f.e.r + 1) / fixtures().length);
       MEDIA.round(rr, f, res, ourSc);
@@ -560,7 +585,7 @@ function Futbol(host) {
     main.innerHTML = html;
     main.onclick = e => {
       const b = e.target.closest('button'); if (!b) return; const n = +b.dataset.n, a = b.dataset.a;
-      if (a === 'cont') { const d = FBS.read(n); if (!d) { toast('Kayıt okunamadı'); return renderTitle(); } FBA.play('confirm'); C = migrate(d); slot = n; if (C._needStats) { delete C._needStats; ensureStats(); save(true); } if (C._recovered) { delete C._recovered; save(true); toast('🛟 Ana kayıt bozuktu, yedekten kurtarıldı'); } show('hub'); }
+      if (a === 'cont') { const d = FBS.read(n); if (!d) { toast('Kayıt okunamadı'); return renderTitle(); } FBA.play('confirm'); slot = n; C = migrate(d); if (C._needStats) { delete C._needStats; ensureStats(); save(true); } if (C._recovered) { delete C._recovered; save(true); toast('🛟 Ana kayıt bozuktu, yedekten kurtarıldı'); } show('hub'); }
       else if (a === 'imp') { FBA.play('ui'); importSave(n); }
       else if (a === 'new') { FBA.play('confirm'); slot = n; sub = { step: 0, d: { first: '', last: '', short: '', num: 9, pos: 'FW', look: { skin: 1, hair: 0, hairC: 0, boots: 0 }, attr: { sut: 50, pas: 50, hiz: 50, teknik: 50, fizik: 50 }, pts: 20, club: null } }; show('create'); }
       else if (a === 'del') { if (b.dataset.sure) { FBS.del(n); FBA.play('back'); toast('Kayıt silindi'); renderTitle(); } else { b.dataset.sure = 1; b.textContent = 'Emin misin?'; b.classList.add('warn'); setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = 'Sil'; b.classList.remove('warn'); } }, 2500); } }
@@ -625,11 +650,16 @@ function Futbol(host) {
     // leagues added in later versions join a running season with an empty table (they catch up on the next round)
     if (d.s && d.s.o) FB_LEAGUES.forEach(X => { if (X.id !== d.s.lg && !d.s.o[X.id]) d.s.o[X.id] = { tab: FBC.newTab(X.teams.length), rd: 0 }; });
     if (d.p.up == null) { d.p.up = Math.min(d.p.sp || 0, 9); d.p.skill = 0; delete d.p.sp; delete d.p.xpLast; d.v = 2; toast('Gelişim sistemi güncellendi: yeni Skill Puanı sistemine geçildi'); }
+    if ((d.v || 0) < 3) {   // v3: lower skill thresholds; points already earned are kept and may now complete a level
+      FBS.backup(slot, d, 'pre3');
+      const g = FBC.addSkill(d.p, 0); d.v = 3;
+      if (g) toast(`Skill eşikleri düşürüldü: +${g} gelişim hakkı kazandın`);
+    }
     return d;
   }
   function createCareer() {
     const d = sub.d;
-    C = { v: 2, created: Date.now().toString(36), club: d.club, p: { first: d.first, last: d.last, short: d.short, num: d.num, pos: d.pos, look: d.look, attr: d.attr, age: 18, up: 0, skill: 0, lvl: 0 }, tot: { apps: 0, g: 0, a: 0, rs: 0 }, tro: [], hist: [], news: [], prev: null, set: { len: 270, zoom: 1 }, live: null };
+    C = { v: 3, created: Date.now().toString(36), club: d.club, p: { first: d.first, last: d.last, short: d.short, num: d.num, pos: d.pos, look: d.look, attr: d.attr, age: 18, up: 0, skill: 0, lvl: 0 }, tot: { apps: 0, g: 0, a: 0, rs: 0 }, tro: [], hist: [], news: [], prev: null, set: { len: 270, zoom: 1 }, live: null };
     FBT.seed = C.created;
     newSeason(2026);
     news(`✍️ ${d.first} ${d.last}, ${club().name} ile ilk profesyonel sözleşmesini imzaladı! Forma: ${d.num} · ${FBU.trU(d.short)}`);
@@ -747,7 +777,7 @@ function Futbol(host) {
     const ROLE_TR = { GK: 'KL', LB: 'SLB', LCB: 'STP', RCB: 'STP', RB: 'SĞB', LCM: 'MO', CM: 'MO', RCM: 'OOS', LW: 'SLK', ST: 'SF', RW: 'SĞK' };
     el.innerHTML = `<div class="fb-kits"><div class="fb-kit"></div><div class="fb-kit"></div></div><h4>${esc(t.name)} · İlk 11 (4-3-3)</h4><div class="fb-list">${sq.map(x => {
       const mine = x.role === role, num = mine ? p.num : (x.num === p.num ? 13 : x.num), name = mine ? p.first + ' ' + p.last : x.name;
-      return `<div class="fb-li ${mine ? 'me' : ''}"><span class="fb-no" style="background:${t.c1};color:${FBU.ink(t.c1)}">${num}</span><span class="grow">${mine ? '' : (FB_NAT[x.nat] || '') + ' '}${esc(name)}${mine ? ' ⭐' : ''}</span><small>${ROLE_TR[x.role]}</small><span class="fb-r">${mine ? FBC.ovr(p) : Math.round(x.sk * 100) - 5}</span></div>`;
+      return `<div class="fb-li ${mine ? 'me' : ''}"><span class="fb-no" style="background:${t.c1};color:${FBU.ink(t.c1)}">${num}</span><span class="grow">${mine ? '' : (FB_NAT[x.nat] || '') + ' '}${esc(name)}${mine ? ' ⭐' : ''}${mine ? '' : (() => { const pf = FBT.prof(C.club, x.role, x.sk), st2 = (C.s.ps || {})[C.club + '|' + x.role] || [0, 0, 0], fm = playerForm(C.club, x.role); return `<small>${pf.styleTr} · ${st2[1]} gol · ${st2[2]} asist · form ${fm > 1.5 ? '▲' : fm < -1.5 ? '▼' : '●'}</small>`; })()}</span><small>${ROLE_TR[x.role]}</small><span class="fb-r">${mine ? FBC.ovr(p) : Math.round(x.sk * 100) - 5}</span></div>`;
     }).join('')}</div>`;
     const k = el.querySelectorAll('.fb-kit'); k[0].appendChild(avatar(p, t, false, 62)); k[1].appendChild(avatar(p, t, true, 62));
   }
@@ -895,7 +925,7 @@ function Futbol(host) {
     if ((C.live && C.live.wk === s.wk && C.live.min > 0) || window.__fbStart) return (C.sel = { wk: s.wk, y: s.year, st: 'start', min: 0 });   // a match already in progress (or a test hook)
     const p = me(), t = club(), role = FBC.ROLE_OF[p.pos], rival = FBT.squad(C.club).find(x => x.role === role), rOvr = Math.round(rival.sk * 100) - 5;
     const recent = s.mine.filter(m => !m.dnp).slice(-5), form = recent.length ? recent.reduce((a, m) => a + m.r, 0) / recent.length : 6.6, streak = C.benchRun || 0;
-    const score = FBC.ovr(p) - rOvr + (form - 6.6) * 6 + (75 - t.r) * .25 + streak * 4 - (f.e.k === 'E' ? 2 : 0);
+    const score = FBC.ovr(p) - rOvr - playerForm(C.club, role) * 1.2 + (form - 6.6) * 6 + (75 - t.r) * .25 + streak * 4 - (f.e.k === 'E' ? 2 : 0);
     const pStart = clamp(1 / (1 + Math.exp(-(score / 5 + .6))), .06, .97), R = Math.random;
     let st = 'start', min = 0, why = '';
     if (R() >= pStart) {
@@ -908,11 +938,11 @@ function Futbol(host) {
   }
   // Minutes played without the user: goals from the scoring model, scorers from the squads
   function preSim(f, upTo) {
-    const t = club(), o = FBT.team(f.opp), [lM, lO] = FBX.lam(t.r, o.r, f.neutral ? 0 : f.home ? 1 : -1), role = FBC.ROLE_OF[me().pos];
+    const t = club(), o = FBT.team(f.opp), [lM, lO] = FBX.lam(t.r + fAdj(C.club), o.r + fAdj(f.opp), f.neutral ? 0 : f.home ? 1 : -1), role = FBC.ROLE_OF[me().pos];
     const sq = FBT.squad(C.club).filter(x => ['ST', 'LW', 'RW', 'CM', 'LCM', 'RCM'].includes(x.role) && x.role !== role), osq = FBT.squad(f.opp).filter(x => x.role !== 'GK');
     const sc = [0, 0], log = [], mt = () => 1 + Math.floor(Math.random() * Math.max(1, upTo - 1));
-    for (let i = FBU.poisson(lM * upTo / 90); i > 0; i--) { sc[0]++; const s2 = FBU.pick(sq); log.push({ m: mt(), side: 0, name: s2.short, r: s2.role }); }
-    for (let i = FBU.poisson(lO * upTo / 90); i > 0; i--) { sc[1]++; const s2 = FBU.pick(osq); log.push({ m: mt(), side: 1, name: s2.short, r: s2.role }); }
+    for (let i = FBU.poisson(lM * upTo / 90); i > 0; i--) { sc[0]++; const s2 = gPick(C.club, sq); log.push({ m: mt(), side: 0, name: s2.short, r: s2.role }); }
+    for (let i = FBU.poisson(lO * upTo / 90); i > 0; i--) { sc[1]++; const s2 = gPick(f.opp, osq); log.push({ m: mt(), side: 1, name: s2.short, r: s2.role }); }
     log.sort((a, b) => a.m - b.m);
     return { min: upTo, sc, us: {}, log };
   }
@@ -948,7 +978,7 @@ function Futbol(host) {
     let lastSave = 0;
     match = FBMatch(wrap, {
       subIn: resume && C.sel && C.sel.st === 'sub' && resume.min === C.sel.min ? C.sel.min : 0,
-      my: club(), opp: FBT.team(f.opp), home: f.home, comp: f.comp, len: C.set.len, zoom: C.set.zoom || 1, onZoom(z) { C.set.zoom = Math.round(z * 100) / 100; }, resume: resume && resume.min > 0 ? resume : null,
+      my: club(), opp: FBT.team(f.opp), home: f.home, comp: f.comp, fr: [fAdj(C.club), fAdj(f.opp)], ballKey: f.e && f.e.k === 'E' ? (C.s.ucup || 'ucl') : C.s.lg, big: !!(derbyOf(C.club, f.opp) || (f.e && f.e.k === 'E') || FBT.team(f.opp).r >= 80), derby: !!derbyOf(C.club, f.opp), formD: formPts(C.club) - formPts(f.opp), uForm: uForm(), len: C.set.len, zoom: C.set.zoom || 1, onZoom(z) { C.set.zoom = Math.round(z * 100) / 100; }, resume: resume && resume.min > 0 ? resume : null,
       user: { name: p.first + ' ' + p.last, short: p.short, num: p.num, pos: p.pos, attr: p.attr, look: p.look },
       onLive(s) { Object.assign(C.live, s); const n = Date.now(); if (n - lastSave > 1500) { lastSave = n; save(true); } },
       onEnd(res) { wrap.remove(); match = null; applyResult(f, res); show('post'); }
