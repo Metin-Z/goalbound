@@ -1,10 +1,10 @@
 /* ===================== GOALBOUND — service worker: offline app shell ===================== */
 'use strict';
 // Bump this on every release so phones fetch the new files (old caches are deleted on activate)
-const VERSION = 'goalbound-v9';
+const VERSION = 'goalbound-v10';
 const SHELL = [
   './', './manifest.json',
-  './css/base.css', './css/goalbound.css',
+  './css/base.css', './css/goalbound.css', './css/theme.css',
   './js/data.js', './js/core.js', './js/match.js', './js/career.js', './js/shell.js', './js/pwa.js'
 ];
 // Cached when present, skipped silently when missing (icons arrive in a later step)

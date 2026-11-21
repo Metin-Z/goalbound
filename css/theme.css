@@ -1,0 +1,66 @@
+/* ===================== GOALBOUND — visual theme layer (design system v1) =====================
+   Loaded after goalbound.css. Only restyles existing classes; no layout/logic changes.
+   Club colours still override --acc/--bg/--panel inline once a career is loaded. */
+
+/* Bundled fonts (offline-safe, latin + latin-ext for Turkish characters) */
+@font-face{font-family:Inter;font-weight:400;font-display:swap;src:url(../assets/fonts/inter-latin-400-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+20AC,U+2122,U+2212}
+@font-face{font-family:Inter;font-weight:400;font-display:swap;src:url(../assets/fonts/inter-latin-ext-400-normal.woff2) format("woff2");unicode-range:U+0100-024F,U+1E00-1EFF}
+@font-face{font-family:Inter;font-weight:600;font-display:swap;src:url(../assets/fonts/inter-latin-600-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+2000-206F,U+20AC}
+@font-face{font-family:Inter;font-weight:600;font-display:swap;src:url(../assets/fonts/inter-latin-ext-600-normal.woff2) format("woff2");unicode-range:U+0100-024F,U+1E00-1EFF}
+@font-face{font-family:Inter;font-weight:700 900;font-display:swap;src:url(../assets/fonts/inter-latin-700-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+2000-206F,U+20AC}
+@font-face{font-family:Inter;font-weight:700 900;font-display:swap;src:url(../assets/fonts/inter-latin-ext-700-normal.woff2) format("woff2");unicode-range:U+0100-024F,U+1E00-1EFF}
+@font-face{font-family:Rajdhani;font-weight:600;font-display:swap;src:url(../assets/fonts/rajdhani-latin-600-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+2000-206F}
+@font-face{font-family:Rajdhani;font-weight:600;font-display:swap;src:url(../assets/fonts/rajdhani-latin-ext-600-normal.woff2) format("woff2");unicode-range:U+0100-024F}
+@font-face{font-family:Rajdhani;font-weight:700 900;font-display:swap;src:url(../assets/fonts/rajdhani-latin-700-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+2000-206F}
+@font-face{font-family:Rajdhani;font-weight:700 900;font-display:swap;src:url(../assets/fonts/rajdhani-latin-ext-700-normal.woff2) format("woff2");unicode-range:U+0100-024F}
+
+/* Design tokens + default (pre-club) palette */
+:root{--gb-bg:#080D16;--gb-panel:#141E2D;--gb-panel-l:#1C293B;--gb-panel-d:#101722;--gb-border:#30445F;--gb-glow:#4B83BC;--gb-blue:#54A9FF;--gb-gold:#FFD447;--gb-ok:#35D08A;--gb-err:#FF505B;--gb-r:14px;--gb-shadow:0 8px 24px rgba(0,0,0,.35)}
+html,body,#app{background:var(--gb-bg)}
+body{font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.fb{--acc:#FF8A00;--accd:#D96A00;--accs:#5A2A00;--acc2:#FFB02E;--bg1:#13213A;--bg2:#0D1421;--bg3:#080D16;--panel:#141E2D;--panel2:#1C293B;--line:rgba(120,160,210,.16);--tx:#F4F7FC;--mut:#AAB7C9;--mut2:#728198;--sub:#DCE4F0;
+  --fd:Rajdhani,"Avenir Next Condensed","Roboto Condensed","Arial Narrow",system-ui,sans-serif;font-family:Inter,system-ui,sans-serif}
+
+/* Headings & numbers: Rajdhani, a touch heavier and wider than the old condensed stack */
+.fb-title{font-family:var(--fd);font-size:19px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.fb-tab h4{color:var(--mut);font-weight:700;letter-spacing:.1em;font-size:13.5px}
+
+/* Top bar & bottom nav */
+.fb-top{background:linear-gradient(180deg,rgba(8,13,22,.92),rgba(8,13,22,.7));border-bottom:1px solid var(--line);box-shadow:0 2px 12px rgba(0,0,0,.3)}
+.fb-top button{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line)}
+.fb-bnav{border-top:1px solid var(--line);box-shadow:0 -4px 16px rgba(0,0,0,.35)}
+.fb-bnav button.on{color:var(--acc2)}
+.fb-bnav button.on i{background:color-mix(in srgb,var(--acc) 22%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--acc) 55%,transparent)}
+
+/* Buttons */
+.fb-btn,.fbm-btn{border-radius:13px;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.fb-btn.pri,.fbm-btn.pri{background:linear-gradient(180deg,color-mix(in srgb,var(--acc) 80%,#fff 20%),var(--acc) 45%,var(--accd));border:1px solid color-mix(in srgb,var(--acc) 60%,#fff 40%);box-shadow:0 3px 0 var(--accs),0 6px 18px color-mix(in srgb,var(--acc) 30%,transparent);text-shadow:0 1px 0 rgba(255,255,255,.2)}
+.fb-btn.big,.fbm-btn{font-family:var(--fd);font-size:17px;letter-spacing:.05em;text-transform:uppercase}
+.fb-btn.ghost{background:rgba(20,30,45,.4);border:1px solid var(--line)}
+.fb-btn.warn{background:linear-gradient(180deg,#ff6b74,#c8323c);border-color:#ff8a92}
+
+/* Panels / cards */
+.fb-next,.fb-pc,.fbm-card,.fb-av,.fb-kits{border:1px solid var(--line);box-shadow:var(--gb-shadow),inset 0 1px 0 rgba(255,255,255,.05)}
+.fb-next{border-radius:var(--gb-r);background:linear-gradient(180deg,var(--panel2),var(--panel))}
+.fbm-card{background:linear-gradient(180deg,var(--panel2),var(--panel));border-radius:20px;box-shadow:0 18px 48px rgba(0,0,0,.55),0 0 0 1px rgba(75,131,188,.18)}
+.fb-li{background:linear-gradient(180deg,rgba(28,41,59,.7),rgba(20,30,45,.7));border:1px solid rgba(120,160,210,.08)}
+.fb-li.me{background:rgba(255,212,71,.12);border-color:rgba(255,212,71,.5)}
+.fb-stats>div{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line)}
+.fb-stats b.hi,.fbm-mt{color:var(--gb-gold)}
+.fb-tip{background:rgba(84,169,255,.1);border-color:rgba(84,169,255,.35);color:#D6E9FF}
+.fb-news>div{background:linear-gradient(90deg,rgba(28,41,59,.8),rgba(20,30,45,.4))}
+.fb-sel,.fb-in{background:var(--gb-panel-d);border:1px solid var(--line)}
+.fb-steps span{background:rgba(28,41,59,.8)}
+.fb-tut,.fbm-tut{border-color:var(--line)}
+
+/* Match HUD */
+.fbm-sb{background:linear-gradient(180deg,#1C293B,#0D1421);border:1px solid rgba(75,131,188,.45);box-shadow:0 4px 16px rgba(0,0,0,.55)}
+.fbm-sc{color:#fff}
+.fbm-mom{background:rgba(13,20,33,.86);border:1px solid rgba(255,212,71,.45);box-shadow:0 6px 20px rgba(0,0,0,.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.fbm-ov{background:rgba(8,13,22,.66)}
+
+/* Landscape phones: hint panel moves to a compact corner card so it no longer covers the player */
+@media (orientation:landscape) and (max-height:500px){
+  .fbm-mom{left:auto;right:max(10px,env(safe-area-inset-right));width:min(38vw,340px);padding:7px 10px;border-radius:12px}
+  .fbm-mom .fbm-hint{font-size:11px;margin:2px 0}
+}
